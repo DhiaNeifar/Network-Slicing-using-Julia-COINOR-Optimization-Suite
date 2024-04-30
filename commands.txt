@@ -1,0 +1,27 @@
+CREATE DOCKERFILE
+
+# Start from the COIN-OR Optimization Suite base image
+FROM coinor/coin-or-optimization-suite
+
+# Install wget to download Julia
+RUN apt-get update && apt-get install -y wget
+
+# Download and install Julia
+RUN wget https://julialang-s3.julialang.org/bin/linux/x64/1.6/julia-1.6.1-linux-x86_64.tar.gz \
+    && tar -xvzf julia-1.6.1-linux-x86_64.tar.gz -C /usr/local --strip-components=1 \
+    && rm julia-1.6.1-linux-x86_64.tar.gz
+
+# Verify Julia installation
+RUN julia --version
+
+
+
+sudo docker build -t coinor-julia-image .
+
+sudo docker run -it coinor-julia-image /bin/bash
+
+install vim within the image too
+
+THE IMAGE WORKS 
+
+NOW I try models
