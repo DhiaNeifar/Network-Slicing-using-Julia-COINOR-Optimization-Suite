@@ -17,7 +17,7 @@ function physical_substrate(number_node)
         edges_adjacency_matrix[source + 1, target + 1], edges_adjacency_matrix[target + 1, source + 1] = 1, 1
         edges_delay[source + 1, target + 1] = rand()
         edges_delay[target + 1, source + 1] = edges_delay[source + 1, target + 1]
-        total_available_bandwidth[source + 1, target + 1] = rand(30: 60)
+        total_available_bandwidth[source + 1, target + 1] = rand(60: 80)
         total_available_bandwidth[target + 1, source + 1] = total_available_bandwidth[source + 1, target + 1]
     end
 

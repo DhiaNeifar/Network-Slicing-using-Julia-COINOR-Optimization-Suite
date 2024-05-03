@@ -38,7 +38,7 @@ for (round_index, Round) in enumerate(Rounds)
                   total_available_bandwidth, edges_delay, number_VNFs, required_cpus, required_bandwidth,
                   delay_tolerance, failed_centers)
 
-    alpha, VNFs_placements, Virtual_links = network_slicing(parameters...)
+    alpha, VNFs_placements, Virtual_links = old_network_slicing(parameters...)
     push!(alphas, alpha)
     push!(VNFs_placements_results, VNFs_placements)
     push!(Virtual_links_results, Virtual_links)

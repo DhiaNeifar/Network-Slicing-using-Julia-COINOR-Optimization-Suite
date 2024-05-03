@@ -6,6 +6,9 @@ FROM coinor/coin-or-optimization-suite
 # Install wget to download Julia
 RUN apt-get update && apt-get install -y wget
 
+# Install vim
+RUN apt-get update && apt-get install -y vim
+
 # Download and install Julia
 RUN wget https://julialang-s3.julialang.org/bin/linux/x64/1.6/julia-1.6.1-linux-x86_64.tar.gz \
     && tar -xvzf julia-1.6.1-linux-x86_64.tar.gz -C /usr/local --strip-components=1 \
@@ -14,14 +17,10 @@ RUN wget https://julialang-s3.julialang.org/bin/linux/x64/1.6/julia-1.6.1-linux-
 # Verify Julia installation
 RUN julia --version
 
+# Install the required Julia packages
+RUN julia -e 'using Pkg; Pkg.add(["JuMP", "AmplNLWriter", "MathOptInterface", "Plots", "ColorSchemes", "Serialization", "FilePathsBase"])'
 
 
-sudo docker build -t coinor-julia-image .
+docker build -t network-slicing .
 
-sudo docker run -it coinor-julia-image /bin/bash
-
-install vim within the image too
-
-THE IMAGE WORKS 
-
-NOW I try models
+docker run -v "D:/PhD/Network Slicing/Network-Slicing-using-Julia-COINOR-Optimization-Suite:/work" -it network-slicing
