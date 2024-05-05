@@ -39,7 +39,6 @@ end
 
 
 function display_solution(VNFs_placements)
-    array = permutedims(VNFs_placements, (3, 2, 1))
     number_slices, number_VNFs, _ = size(VNFs_placements)
     for s in 1: number_slices
         println("\n")
@@ -48,5 +47,29 @@ function display_solution(VNFs_placements)
             println("VNF $(k)")
             println(VNFs_placements[s, k, :])
         end
+    end
+end
+
+function display_cpu_usage(required_cpus, assigned_cpus)
+    required_cpus = permutedims(required_cpus, (2, 1))
+    assigned_cpus = permutedims(assigned_cpus, (2, 1))
+    number_slices, _= size(assigned_cpus)
+    for s in 1: number_slices
+        println("\n")
+        println("Slice $(s)")
+        println("Required ", required_cpus[s, :])
+        println("Assigned ", assigned_cpus[s, :])
+    end
+end
+
+function display_bandwidth_usage(required_cpus, assigned_cpus)
+    required_cpus = permutedims(required_cpus, (2, 1))
+    assigned_cpus = permutedims(assigned_cpus, (2, 1))
+    number_slices, _= size(assigned_cpus)
+    for s in 1: number_slices
+        println("\n")
+        println("Slice $(s)")
+        println("Required ", required_cpus[s, :])
+        println("Assigned ", assigned_cpus[s, :])
     end
 end
