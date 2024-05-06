@@ -3,9 +3,9 @@ const MOI = MathOptInterface
 
 function network_slicing(number_slices, total_number_centers, total_available_cpus, edges_adjacency_matrix, total_available_bandwidth, edges_delay, number_VNFs, required_cpus, required_bandwidth, delay_tolerance, failed_centers)
 
-    model = Model(() -> AmplNLWriter.Optimizer(Couenne_jll.amplexe, ["bonmin.time_limit=2000"]))
+    model = Model(() -> AmplNLWriter.Optimizer(Couenne_jll.amplexe, ["bonmin.time_limit=1000"]))
     
-    set_attributes(model, "tol" => 1e-7, "max_iter" => 10000)
+    set_attributes(model, "tol" => 1e-6, "max_iter" => 1000)
 
     # Decision Variables    
     # VNFs Mapping

@@ -16,12 +16,12 @@ function physical_substrate(number_node)
         edges_adjacency_matrix[source, target], edges_adjacency_matrix[target, source] = 1, 1
         edges_delay[source, target] = rand()
         edges_delay[target, source] = edges_delay[source, target]
-        total_available_bandwidth[source, target] = rand(30: 40)
+        total_available_bandwidth[source, target] = rand(60: 80)
         total_available_bandwidth[target, source] = total_available_bandwidth[source, target]
     end
 
     total_number_centers = min(total_number_centers, number_node)
-    total_available_cpus = rand(30: 50, total_number_centers)
+    total_available_cpus = rand(70: 90, total_number_centers)
 
     return (total_number_centers, total_available_cpus, longitude[1: total_number_centers],
             latitude[1: total_number_centers], edges_adjacency_matrix[1: total_number_centers, 1: total_number_centers],
