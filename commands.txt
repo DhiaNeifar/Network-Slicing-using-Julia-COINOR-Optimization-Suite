@@ -24,3 +24,9 @@ RUN julia -e 'using Pkg; Pkg.add(["JuMP", "AmplNLWriter", "MathOptInterface", "P
 docker build -t network-slicing .
 
 docker run -v "D:/PhD/Network Slicing/Network-Slicing-using-Julia-COINOR-Optimization-Suite:/work" -it network-slicing
+
+
+GIT PUSH 
+git add .
+git commit -m "Message"
+git push -u origin main
