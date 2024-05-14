@@ -73,3 +73,13 @@ function display_bandwidth_usage(required_cpus, assigned_cpus)
         println("Assigned ", assigned_cpus[s, :])
     end
 end
+
+function bump(x, z0, z1)
+    if x < z0
+        return 1
+    end
+    if z0 <= x < z1
+        return 1 / 2 * cos(pi * ((z0 - x)/(z0 - z1)))
+    end
+    return 0
+end

@@ -1,12 +1,12 @@
-using JuMP, AmplNLWriter, Ipopt, Couenne_jll, MathOptInterface
+using JuMP, AmplNLWriter, Ipopt, MathOptInterface
 const MOI = MathOptInterface
 
 
 include("physical_substrate.jl")
 include("slice_instantiation.jl")
+include("utils.jl")
 
-
-function network_slicing(number_slices, total_number_centers, total_available_cpus, total_available_bandwidth, edges_delay, number_VNFs, required_cpus, required_bandwidth, delay_tolerance)
+function network_slicing(number_slices, number_VNFs, total_number_centers, total_available_cpus, required_cpus)   
     
     model = Model(Ipopt.Optimizer)
 
@@ -14,7 +14,7 @@ function network_slicing(number_slices, total_number_centers, total_available_cp
     for s in 1: number_slices
         for c in 1: total_number_centers
             for k in 1: number_VNFs
-                VNFs_placements[s, k, c] = @variable(model, base_name="slice_$(s)_center_$(c)_VNF_$(k)", binary=true)
+                VNFs_placements[s, k, c] = @variable(model, base_name="slice_$(s)_center_$(c)_VNF_$(k)", lower_bound=0, upper_bound=1)
             end
         end
     end
@@ -24,8 +24,7 @@ function network_slicing(number_slices, total_number_centers, total_available_cp
             assigned_cpus[s, k] = @variable(model, base_name="assigned_cpus_slice_$(s)_VNF_$(k)", lower_bound=0, upper_bound=required_cpus[s, k])
         end
     end
-
-    @objective(model, Max, sum(log(1 + assigned_cpus[s, k] / required_cpus[s, k] * VNFs_placements[s, k, c]) for s in 1: number_slices for k in 1: number_VNFs for c in 1:total_number_centers))
+    @objective(model, Max, sum(log(1 + (assigned_cpus[s, k] * VNFs_placements[s, k, c]) / required_cpus[s, k]) - (sin(VNFs_placements[s, k, c] * pi) * (number_slices * number_VNFs)) for s in 1: number_slices for k in 1: number_VNFs for c in 1: total_number_centers))
     
     # Constraints
 
@@ -36,10 +35,11 @@ function network_slicing(number_slices, total_number_centers, total_available_cp
             @constraint(model, sum(VNFs_placements[s, k, c] for c in 1:total_number_centers) == 1)
         end
     end
+    
     # Constraint 2: Each VNF is assigned to an exactly one center.
     for s in 1: number_slices
         for c in 1: total_number_centers
-            @constraint(model, sum(VNFs_placements[s, k, c] for k in 1: number_VNFs) <= ceil(div(number_VNFs, max(1, (total_number_centers - 1)))) + 1)
+            @constraint(model, sum(VNFs_placements[s, k, c] for k in 1: number_VNFs) <= 1)
         end
     end
     # Constraint 3: Guarantee that allocated VNF resources do not exceed physical servers' processing capacity.
@@ -58,20 +58,20 @@ function network_slicing(number_slices, total_number_centers, total_available_cp
         println("The solver stopped with status: $status")
     end
 
-    
     # Extract Results Values
     vnf_placement_values = Array{Int, 3}(undef, number_slices, number_VNFs, total_number_centers)
     for s in 1: number_slices
         for k in 1: number_VNFs
             for c in 1: total_number_centers
                 if value(VNFs_placements[s, k, c]) > 0.5
-                vnf_placement_values[s, k, c] = 1
-                else 
+                    vnf_placement_values[s, k, c] = 1
+                else
                     vnf_placement_values[s, k, c] = 0
-                end
+                end 
             end
         end
     end
+
     assigned_cpus_values = Array{Float32, 2}(undef, number_slices, number_VNFs)
     for s in 1: number_slices
         for k in 1: number_VNFs
@@ -81,17 +81,19 @@ function network_slicing(number_slices, total_number_centers, total_available_cp
     return vnf_placement_values, assigned_cpus_values
 end
 
-number_node = 5
+number_node = 10
 total_number_centers, total_available_cpus, _, _, _, _, _ = physical_substrate(number_node)
 
 
-number_slices = 3
-number_VNFs = 4
+number_slices = 7
+number_VNFs = 8
 
 required_cpus, _, _ = slice_instantiation(number_slices, number_VNFs)
 
 
-vnf_placement_values, assigned_cpus_values = network_slicing(number_slices, total_number_centers, total_available_cpus, _, _, number_VNFs, required_cpus, _, _)   
+
+vnf_placement_values, assigned_cpus_values = network_slicing(number_slices, number_VNFs, total_number_centers, total_available_cpus, required_cpus)
 
 println(required_cpus)
 println(assigned_cpus_values)
+display_solution(vnf_placement_values)
