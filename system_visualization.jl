@@ -95,8 +95,6 @@ function system_visualization()
     required_cpus = data["required_cpus"]
     assigned_cpus = data["assigned_cpus"]
     VNFs_placements = data["VNFs_placements"]
-    required_bandwidth = data["required_bandwidth"]
-    assigned_bandwidth = data["assigned_bandwidth"]
     Virtual_links = data["Virtual_links"]
     Rounds = data["Rounds"]
     failed_centers = []
@@ -105,8 +103,7 @@ function system_visualization()
 
     number_node = size(total_available_cpus)[1]
 
-    total_number_centers, _, longitude, latitude, edges_adjacency_matrix, 
-    _, _ = physical_substrate(number_node)
+    total_number_centers, _, longitude, latitude, edges_adjacency_matrix, _, _ = physical_substrate(number_node)
 
     for (round_index, Round) in enumerate(Rounds)
         println("Round ", round_index)
@@ -116,15 +113,13 @@ function system_visualization()
             end
         end
         
-        display_solution(VNFs_placements[round_index])
+        display_solution(VNFs_placements[round_index], Virtual_links[round_index])
         display_cpu_usage(required_cpus, assigned_cpus[round_index])
-        println(required_bandwidth)
-        println(assigned_bandwidth[round_index])
         append!(failed_centers, Round)
-        # p1 = substrate_visualization(longitude, latitude, edges_adjacency_matrix, VNFs_placements[round_index], Virtual_links[round_index], failed_centers)
+        p1 = substrate_visualization(longitude, latitude, edges_adjacency_matrix, VNFs_placements[round_index], Virtual_links[round_index], failed_centers)
         # p2 = system_performance(total_number_centers, total_available_cpus, required_cpus, VNFs_placements, alpha)
-        # p = plot(p1, layout=(1, 2), legend=false)
-        # display(p)
+        p = plot(p1, layout=(1, 2), legend=false)
+        display(p)
     end
 end
 

@@ -38,14 +38,26 @@ function load_data()
 end
 
 
-function display_solution(VNFs_placements)
-    number_slices, number_VNFs, _ = size(VNFs_placements)
+function display_solution(VNFs_placements, Virtual_links)
+    number_slices, number_VNFs, total_number_centers, total_number_centers = size(Virtual_links)
+    println("\n")
+    println("VNF Placements")
+    for s in 1: number_slices
+        println("\n")
+        println("Slice $(s)")
+        for k in 1: number_VNFs + 1
+            println("VNF $(k)")
+            println(VNFs_placements[s, k, :])
+        end
+    end
+    println("\n")
+    println("Virtual Links")
     for s in 1: number_slices
         println("\n")
         println("Slice $(s)")
         for k in 1: number_VNFs
-            println("VNF $(k)")
-            println(VNFs_placements[s, k, :])
+            println("VNF $(k) -> VNF $(k + 1)")
+            println(Virtual_links[s, k, :, :])
         end
     end
 end

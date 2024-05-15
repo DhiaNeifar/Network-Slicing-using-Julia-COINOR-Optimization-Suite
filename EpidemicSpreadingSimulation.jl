@@ -22,7 +22,6 @@ failed_centers = Int[]
 
 assigned_cpus_results = Vector{Array{Float32, 2}}()
 VNFs_placements_results = Vector{Array{Int, 3}}()
-assigned_bandwidth_results = Vector{Array{Float32, 2}}()
 Virtual_links_results = Vector{Array{Int, 4}}()
 
 for (round_index, Round) in enumerate(Rounds)
@@ -39,10 +38,9 @@ for (round_index, Round) in enumerate(Rounds)
                   total_available_bandwidth, edges_delay, number_VNFs, required_cpus, required_bandwidth,
                   delay_tolerance, failed_centers)
 
-    VNFs_placements, assigned_cpus, Virtual_links, assigned_bandwidth = network_slicing(parameters...)
+    VNFs_placements, assigned_cpus, Virtual_links = network_slicing(parameters...)
     push!(assigned_cpus_results, assigned_cpus)
     push!(VNFs_placements_results, VNFs_placements)
-    push!(assigned_bandwidth_results, assigned_bandwidth)
     push!(Virtual_links_results, Virtual_links)
 
 end
@@ -52,7 +50,6 @@ data = Dict("Rounds" => Rounds,
 "assigned_cpus" => assigned_cpus_results, 
 "VNFs_placements" => VNFs_placements_results,
 "required_bandwidth" => required_bandwidth,
-"assigned_bandwidth" => assigned_bandwidth_results,
 "Virtual_links" => Virtual_links_results,)
 save_results(data)
 
