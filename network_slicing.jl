@@ -1,4 +1,4 @@
-using JuMP, AmplNLWriter, Couenne_jll, MathOptInterface
+using JuMP, AmplNLWriter, Ipopt, MathOptInterface
 const MOI = MathOptInterface
 
 function bump(x::Float64, z0::Float64, z1::Float64)
@@ -27,7 +27,7 @@ function network_slicing(number_slices, total_number_centers, total_available_cp
     assigned_cpus = Array{VariableRef, 2}(undef, number_slices, number_VNFs)
     for s in 1: number_slices
         for k in 1: number_VNFs
-            assigned_cpus[s, k] = @variable(model, base_name="assigned_cpus_slice_$(s)_VNF_$(k)", lower_bound=1, upper_bound=required_cpus[s, k])
+            assigned_cpus[s, k] = @variable(model, base_name="assigned_cpus_slice_$(s)_VNF_$(k)", lower_bound=1, upper_bound=required_cpus[s, k], start = required_cpus[s, k])
         end
     end
     Virtual_links = Array{VariableRef, 4}(undef, number_slices, number_VNFs - 1, total_number_centers, total_number_centers)
@@ -40,7 +40,7 @@ function network_slicing(number_slices, total_number_centers, total_available_cp
             end
         end
     end
-    @NLobjective(model, Max, sum(log(1 + (assigned_cpus[s, k] * VNFs_placements[s, k, c]) / required_cpus[s, k])
+    @NLobjective(model, Max, 100 * sum(log(1 + (assigned_cpus[s, k] * VNFs_placements[s, k, c]) / required_cpus[s, k])
     for s in 1: number_slices 
         for k in 1: number_VNFs 
             for c in 1: total_number_centers)

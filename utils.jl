@@ -1,6 +1,6 @@
 using Serialization
 import FilePathsBase: joinpath, mkdir
-
+using Printf
 
 function save_results(data_tosave)
     curr_path = pwd()  # Get the current working directory
@@ -94,4 +94,10 @@ function bump(x, z0, z1)
         return 1 / 2 * cos(pi * ((z0 - x)/(z0 - z1)))
     end
     return 0
+end
+
+function print_iteration(k, args...)
+    f(x) = Printf.@sprintf("%12.4e", x)
+    println(lpad(k, 9), " ", join(f.(args), " "))
+    return
 end

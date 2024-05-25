@@ -1,9 +1,9 @@
 using Random
 
 function slice_instantiation(num_slices, number_VNFs=6)
-    required_cpus = [rand(20: 50) for _ in 1: num_slices, _ in 1: number_VNFs]
-    required_bandwidth = [rand(10: 20) for _ in 1: num_slices, _ in 1: number_VNFs - 1]
-    delay_tolerance = rand(1: 3, num_slices)
+    number_cycles = [rand(1.0: 1.5) for _ in 1: num_slices, _ in 1: number_VNFs]
+    traffic = [rand(30: 50) for _ in 1: num_slices, _ in 1: number_VNFs - 1]
+    delay_tolerance = rand(10000: 300000, num_slices)
 
-    return required_cpus, required_bandwidth, delay_tolerance
+    return number_cycles, traffic, delay_tolerance
 end
