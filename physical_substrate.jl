@@ -19,7 +19,7 @@ function physical_substrate(number_nodes)
     end
 
     total_number_nodes = min(total_number_nodes, number_nodes)
-    total_cpus_clocks = rand(100.0: 500.0, total_number_nodes)
+    total_cpus_clocks = rand(3.0: 5.0, total_number_nodes)
 
     return (total_number_nodes, total_cpus_clocks, longitude[1: total_number_nodes],
             latitude[1: total_number_nodes], adjacency_matrix[1: total_number_nodes, 1: total_number_nodes],
