@@ -26,17 +26,19 @@ function save_results(data_tosave)
     end
 end
 
-
 function load_data()
     data = Dict()
     results = joinpath(pwd(), "results")
-    test_path = joinpath(results, "Test $(length(readdir(results)))")
+    test_path = joinpath(results, "Test 3")
     for filename in readdir(test_path)
         data[filename[1: end - 4]] = deserialize(open(joinpath(test_path, filename), "r"))
     end
     return data
 end
 
+function get_color(index)
+    return ColorSchemes.tab20.colors[index]
+end
 
 function display_solution(VNFs_placements, Virtual_links)
     number_slices, number_VNFs, total_number_centers, total_number_centers = size(Virtual_links)

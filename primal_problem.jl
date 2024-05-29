@@ -17,10 +17,9 @@ function primal_problem(number_slices, number_nodes, total_cpus_clocks, total_th
             throughput[s, k] = @variable(model, base_name="throughput_slice_$(s)_VL$(k)_to_VL$(k + 1)", lower_bound=0)
         end
     end
-    alpha = 0.5
 
-    @objective(model, Min, sum(alpha * (cycles[s, k] + number_cycles[s, k] / cycles[s, k]) for s in 1: number_slices for k in 1: number_VNFs) + sum((1 - alpha) * (throughput[s, k] + traffic[s, k] / throughput[s, k]) for s in 1: number_slices for k in 1: number_VNFs - 1))
-
+    @objective(model, Min, -sum(sum(cycles[s, k] for k in 1: number_VNFs) + sum(throughput[s, k] for k in 1: number_VNFs - 1) for s in 1: number_slices))
+    
     # Constraints
     constraints = Dict{String, ConstraintRef}()
     # Node Embedding Constraints
@@ -41,10 +40,10 @@ function primal_problem(number_slices, number_nodes, total_cpus_clocks, total_th
 
     # Delay Constraints
     # Constraint 1: Total delay of a slice cannot exceed delay tolerance.
-    for s in 1: number_slices
-        con_name = "Slice$(s)_delay_constraint"
-        constraints[con_name] = @constraint(model, sum(number_cycles[s, k] / cycles[s, k] for s in 1: number_slices for k in 1: number_VNFs) + sum(traffic[s, k] / throughput[s, k] for s in 1: number_slices for k in 1: number_VNFs - 1) <= delay_tolerance[s])
-    end
+    # for s in 1: number_slices
+    #     con_name = "Slice$(s)_delay_constraint"
+    #     constraints[con_name] = @constraint(model, sum(number_cycles[s, k] / cycles[s, k] for s in 1: number_slices for k in 1: number_VNFs) + sum(traffic[s, k] / throughput[s, k] for s in 1: number_slices for k in 1: number_VNFs - 1) <= delay_tolerance[s])
+    # end
     
 
     # Solve the problem
@@ -76,9 +75,9 @@ function primal_problem(number_slices, number_nodes, total_cpus_clocks, total_th
             push!(λ, dual(constraints[con_name]))
         end
     end
-    for s in 1: number_slices
-        con_name = "Slice$(s)_delay_constraint"
-        push!(λ, dual(constraints[con_name]))
-    end
+    # for s in 1: number_slices
+    #     con_name = "Slice$(s)_delay_constraint"
+    #     push!(λ, dual(constraints[con_name]))
+    # end
     return objective_value(model), cycles_values, throughput_values, λ
 end

@@ -1,8 +1,6 @@
 using Plots
 using ColorSchemes
-using DataFrames
 using Printf
-
 
 include("physical_substrate.jl")
 include("utils.jl")
@@ -35,10 +33,6 @@ function system_visualization()
         p = plot(p1, p2, layout=(1, 2), legend=false, size=(1200, 600))
         display(p)
     end
-end
-
-function get_color(index)
-    return ColorSchemes.tab20.colors[index]
 end
 
 function substrate_visualization(longitude, latitude, adjacency_matrix, VNFs_placements, Virtual_links, failed_centers)
