@@ -6,100 +6,80 @@ include("primal_problem.jl")
 include("master_problem.jl")
 include("utils.jl")
 
-function compute_objective(number_slices, number_nodes, total_cpus_clocks, total_throughput, number_VNFs, number_cycles, traffic, delay_tolerance, VNFs_placements, Virtual_links, clocks, throughput, slices_deployed, λ)
-    objective_value = sum((sum(clocks[s, k] * VNFs_placements[s, k, c] for k in 1: number_VNFs for c in 1: number_nodes) + 
-    sum(throughput[s, k] * Virtual_links[s, k, i, j] for k in 1: number_VNFs - 1 for i in 1: number_nodes for j in 1: number_nodes)) + slices_deployed[s] for s in 1: number_slices)
-    println("Objective function master_problem: $(objective_value)")
-    objective_value2 = sum(sum(clocks[s, k] + throughput[s, k] for k in 1: number_VNFs - 1) + slices_deployed[s]  for s in 1: number_slices)
-    println("Objective function master_problem: $(objective_value2)")
-end
-
-
 function main()
     number_node = 15
     number_nodes, total_cpus_clocks, _, _, adjacency_matrix, total_throughput = physical_substrate(number_node)
     number_slices = 15
-    number_VNFs = 5
+    number_VNFs = 7
     number_uRLLC, number_eMBB, number_mMTC, number_cycles, traffic, delay_tolerance = slice_instantiation(number_slices)
-    println(number_uRLLC)
-    println(number_eMBB)
-    println(number_mMTC)
-    vnf_placement, virtual_link, clocks, throughput, slices_deployed = GBD(number_slices, number_nodes, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, delay_tolerance)
-    # println(clocks)
-    # println(throughput)
-    println(slices_deployed)
-    data = Dict(
-    "total_cpus_clocks" => total_cpus_clocks,
-    "number_cycles" => number_cycles, 
-    "clocks" => clocks, 
-    "vnf_placement" => vnf_placement,
-    "traffic" => traffic,
-    "total_throughput" => total_throughput,
-    "throughput" => throughput,
-    "virtual_link" => virtual_link,)
-    save_results(data)
+    # vnf_placement, virtual_link, clocks, throughput = GBD(number_slices, number_nodes, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, delay_tolerance)
+    # data = Dict(
+    # "total_cpus_clocks" => total_cpus_clocks,
+    # "number_cycles" => number_cycles, 
+    # "cycles" => cycles, 
+    # "vnf_placement" => vnf_placement,
+    # "traffic" => traffic,
+    # "total_throughput" => total_throughput,
+    # "throughput" => throughput,
+    # "virtual_link" => virtual_link,)
+    # save_results(data)
 end
 
-function GBD(number_slices, number_nodes, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, delay_tolerance)
+function GBD(number_slices, number_nodes, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, delay_tolerance, number_failed_nodes, β)
     
     # Initialization
     epsilon = 1e-3
-    vnf_placement, virtual_link = find_v0(number_slices, number_nodes, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, delay_tolerance)
-    println("Initial Guess")
+    objective_value, vnf_placement, virtual_link = find_v0(number_slices, number_nodes, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, delay_tolerance, number_failed_nodes, β)
     # display_solution(vnf_placement, virtual_link)
-    num_iter = 2
+    num_iter = 100
     UBD = Inf
     LBD = -Inf
     VNFs_placements = []
     Virtual_Links = []
     Clocks = []
     Throughputs = []
-    Slices_deployed = []
     lambdas = []
     mus = []
     best_vnf_placement = NaN
     best_virtual_link = NaN
     best_clocks = NaN
-    best_slices_deployed = NaN
     best_throughput = NaN
+    best_objective_value = objective_value
+    # println("Initial Guess")
+    # display_solution(vnf_placement, virtual_link)
     for iter in 1: num_iter
-        objective_value, clocks, throughput, slices_deployed, λ = primal_problem(number_slices, number_nodes, total_cpus_clocks, total_throughput, number_VNFs, number_cycles, traffic, delay_tolerance, vnf_placement, virtual_link)
-        # println(λ)
+        objective_value, clocks, throughput, λ = primal_problem(number_slices, number_nodes, total_cpus_clocks, total_throughput, number_VNFs, number_cycles, traffic, delay_tolerance, vnf_placement, virtual_link, β)
         push!(Clocks, clocks)
         push!(Throughputs, throughput)
-        push!(Slices_deployed, slices_deployed)
         push!(lambdas, λ)
-        # println("Objective function primal_problem: $(objective_value)")
-        if abs(objective_value) < abs(UBD)
+        if objective_value < UBD
             UBD = objective_value
             best_vnf_placement = vnf_placement
             best_virtual_link = virtual_link
             best_clocks = clocks
-            best_slices_deployed = slices_deployed
             best_throughput = throughput
+            best_objective_value = objective_value
         end
-        if abs(UBD - LBD) < epsilon
-            println("Convergea 1")
+        if abs(UBD - LBD) < epsilon || UBD < LBD
             print_iteration(iter, UBD, LBD)
-            return best_vnf_placement, best_virtual_link, best_clocks, best_throughput, best_slices_deployed
+            return best_objective_value, best_vnf_placement, best_virtual_link, best_clocks, best_throughput
         end
-        # compute_objective(number_slices, number_nodes, total_cpus_clocks, total_throughput, number_VNFs, number_cycles, traffic, delay_tolerance, best_vnf_placement, best_virtual_link, best_clocks, best_throughput, best_slices_deployed, λ)
-        vnf_placement, virtual_link, mu = master_problem(number_slices, number_nodes, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, delay_tolerance, Clocks, Throughputs, Slices_deployed, lambdas)
+        vnf_placement, virtual_link, mu = master_problem(number_slices, number_nodes, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, delay_tolerance, Clocks, Throughputs, lambdas, number_failed_nodes, β)
         best_vnf_placement, best_virtual_link = vnf_placement, virtual_link
         push!(VNFs_placements, vnf_placement)
         push!(Virtual_Links, virtual_link)
         push!(mus, mu)
         if mu > LBD
             LBD = mu
+            best_objective_value = mu
         end
-        if abs(UBD - LBD) < epsilon
-            println("Convergea 2")
+        if abs(UBD - LBD) < epsilon || UBD < LBD
             print_iteration(iter, UBD, LBD)
-            return best_vnf_placement, best_virtual_link, best_cycles, best_throughput, best_slices_deployed
+            return best_objective_value, best_vnf_placement, best_virtual_link, best_clocks, best_throughput
         end
         print_iteration(iter, UBD, LBD)
     end
-    return best_vnf_placement, best_virtual_link, best_clocks, best_throughput, best_slices_deployed
+    return best_objective_value, best_vnf_placement, best_virtual_link, best_clocks, best_throughput
 end
 
-main()
+# main()

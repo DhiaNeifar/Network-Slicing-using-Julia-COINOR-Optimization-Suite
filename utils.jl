@@ -1,4 +1,4 @@
-using Serialization
+using JSON
 import FilePathsBase: joinpath, mkdir
 using Printf
 
@@ -19,26 +19,26 @@ function save_results(data_tosave)
     if !isdir(result_path)
         mkdir(result_path)
     end
-
     # Serialize and save each data item
     for (key, value) in data_tosave
-        serialize(open(joinpath(result_path, "$key.jls"), "w"), value)
+        write(open(joinpath(result_path, "$key.json"), "w"), JSON.json(value))
     end
 end
+
 
 function load_data()
     data = Dict()
     results = joinpath(pwd(), "results")
-    test_path = joinpath(results, "Test 3")
+    test_path = joinpath(results, "Test $(length(readdir(results)))")
     for filename in readdir(test_path)
-        data[filename[1: end - 4]] = deserialize(open(joinpath(test_path, filename), "r"))
+        json_string = open(joinpath(test_path, filename), "r") do file
+            read(file, String)
+        end
+        data[filename[1: end - 4]] = JSON.parse(json_string)
     end
     return data
 end
 
-function get_color(index)
-    return ColorSchemes.tab20.colors[index]
-end
 
 function display_solution(VNFs_placements, Virtual_links)
     number_slices, number_VNFs, total_number_centers, total_number_centers = size(Virtual_links)
@@ -104,3 +104,9 @@ function print_iteration(k, args...)
     return
 end
 
+function compute_delay(number_cycles, traffic, VNFs_placements, Virtual_links, clocks, throughput, s)
+    _, number_VNFs, number_nodes = size(VNFs_placements)
+    delay = 10 ^ -6 * sum(number_cycles[s] / clocks[s, k] * VNFs_placements[s, k, c] for k in 1: number_VNFs for c in 1: number_nodes) + 
+    10 ^ -3 * sum(traffic[s] / throughput[s, k] * Virtual_links[s, k, i, j] for k in 1: number_VNFs - 1 for i in 1: number_nodes for j in 1: number_nodes)
+    return delay
+end

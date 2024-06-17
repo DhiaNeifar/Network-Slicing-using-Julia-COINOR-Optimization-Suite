@@ -1,6 +1,7 @@
 using JuMP, AmplNLWriter, HiGHS, MathOptInterface
 
-function master_problem(number_slices, number_nodes, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, delay_tolerance, Clocks, Throughputs, Slices_deployed, lambdas)
+
+function master_problem(number_slices, number_nodes, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, delay_tolerance, Clocks, Throughputs, lambdas, number_failed_nodes, β)
     model = Model(HiGHS.Optimizer)
     set_silent(model)
     mu = @variable(model, base_name="auxiliary_variable")
@@ -26,18 +27,15 @@ function master_problem(number_slices, number_nodes, total_cpus_clocks, adjacenc
     @objective(model, Min, mu)
     
     # Constraints
-    alpha = 0.5
     for (index, clocks) in enumerate(Clocks)
         throughput = Throughputs[index]
-        slices_deployed = Slices_deployed[index]
         λ = lambdas[index]
-        @constraint(model, sum((sum(clocks[s, k] * VNFs_placements[s, k, c] for k in 1: number_VNFs for c in 1: number_nodes) + 
-        sum(throughput[s, k] * Virtual_links[s, k, i, j] for k in 1: number_VNFs - 1 for i in 1: number_nodes for j in 1: number_nodes)) + slices_deployed[s] for s in 1: number_slices) +
-        sum(-λ[c] * (sum(VNFs_placements[s, k, c] * clocks[s, k] for s in 1: number_slices, k in 1: number_VNFs) - total_cpus_clocks[c]) for c in 1: number_nodes) +
-        sum(-λ[number_nodes * i + j] * (sum(Virtual_links[s, k, i, j] * throughput[s, k] for s in 1: number_slices, k in 1: number_VNFs - 1) - total_throughput[i, j]) for i in 1: number_nodes for j in 1: number_nodes) +
-        sum(-λ[number_nodes * (number_nodes + 1) + s] * (10 ^ -6 * sum(number_cycles[s] / clocks[s, k] * VNFs_placements[s, k, c] for k in 1: number_VNFs for c in 1: number_nodes) + 10 ^ -3 * 
-        sum(traffic[s] / throughput[s, k] * Virtual_links[s, k, i, j] for k in 1: number_VNFs - 1 for i in 1: number_nodes for j in 1: number_nodes) - delay_tolerance[s] * slices_deployed[s]) for s in 1: number_slices)
-        <= mu)
+        @constraint(model, sum(β[s, 1] * (sum(clocks[s, k] * VNFs_placements[s, k, c] for k in 1: number_VNFs for c in 1: number_nodes) + 
+        sum(throughput[s, k] * Virtual_links[s, k, i, j] for k in 1: number_VNFs - 1 for i in 1: number_nodes for j in 1: number_nodes)) + 
+        β[s, 2] * (10 ^ -6 * sum(number_cycles[s, k] / clocks[s, k] * VNFs_placements[s, k, c] for k in 1: number_VNFs for c in 1: number_nodes) + 10 ^ -3 * 
+        sum(traffic[s, k] / throughput[s, k] * Virtual_links[s, k, i, j] for k in 1: number_VNFs - 1 for i in 1: number_nodes for j in 1: number_nodes)) for s in 1: number_slices) + 
+        sum(-λ[c] * (sum(VNFs_placements[s, k, c] * clocks[s, k] for s in 1: number_slices, k in 1: number_VNFs) - total_cpus_clocks[c]) for c in 1: number_nodes) + 
+        sum(-λ[number_nodes * i + j] * (sum(Virtual_links[s, k, i, j] * throughput[s, k] for s in 1: number_slices, k in 1: number_VNFs - 1) - total_throughput[i, j]) for i in 1: number_nodes for j in 1: number_nodes) <= mu)
     end
 
     # Node Embedding Constraints
@@ -47,10 +45,11 @@ function master_problem(number_slices, number_nodes, total_cpus_clocks, adjacenc
             @constraint(model, sum(VNFs_placements[s, k, c] for c in 1:number_nodes) == 1)
         end
     end
+    
     # Constraint 2: Each VNF is assigned to an exactly one center.
     for s in 1: number_slices
         for c in 1: number_nodes
-            @constraint(model, sum(VNFs_placements[s, k, c] for k in 1: number_VNFs) <= 1)
+            @constraint(model, sum(VNFs_placements[s, k, c] for k in 1: number_VNFs) <= ceil(div(number_VNFs, max(1, (number_nodes - number_failed_nodes)))) + 1)
         end
     end
 

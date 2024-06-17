@@ -1,52 +1,91 @@
 using Plots
 using ColorSchemes
+using DataFrames
 using Printf
+
 
 include("physical_substrate.jl")
 include("utils.jl")
 
 
-function system_visualization()
-    data = load_data()
-    total_cpus_clocks = data["total_cpus_clocks"]
-    cycles = data["cycles"]
-    VNFs_placements = data["vnf_placement"]
-    Virtual_links = data["virtual_link"]
-    failed_centers = []
-    
+function system_visualization(total_cpus_clocks, Clocks, VNFs_placements, Throughput, Virtual_links, number_uRLLC, number_eMBB, number_mMTC, Rounds, number_cycles, traffic, objective_values)
+    # data = load_data()
+    # total_cpus_clocks = data["total_cpus_clocks"]
+    # clocks = data["clocks"]
+    # VNFs_placements = data["vnf_placement"]
+    # Virtual_links = data["virtual_link"]
+    # Rounds = data["failed_nodes"]
+    # objective_values = data["objective_function"]
     number_nodes = size(total_cpus_clocks)[1]
-
     number_nodes, _, longitude, latitude, adjacency_matrix, _ = physical_substrate(number_nodes)
-    Rounds = [[]]
-    for (round_index, Round) in enumerate(Rounds)
-        println("Round ", round_index)
-        if !isempty(Round)
-            for center in Round
-                total_available_cpus[center + 1] = 0
-            end
+    for (round_index, failed_nodes) in enumerate(Rounds)
+        total_cpus_clocks_copy = copy(total_cpus_clocks)
+        failed_nodes = Rounds[round_index]
+        vnf_placement = VNFs_placements[round_index] 
+        clocks = Clocks[round_index]
+        for node in failed_nodes
+            total_cpus_clocks_copy[node] = 0
         end
-
-        # display_cpu_usage(required_cpus, assigned_cpus[round_index])
-        append!(failed_centers, Round)
-        p1 = substrate_visualization(longitude, latitude, adjacency_matrix, VNFs_placements, Virtual_links, failed_centers)
-        p2 = system_performance(total_cpus_clocks, VNFs_placements, cycles)
-        p = plot(p1, p2, layout=(1, 2), legend=false, size=(1200, 600))
+        p1 = substrate_visualization(longitude, latitude, adjacency_matrix, VNFs_placements[round_index], Virtual_links[round_index], failed_nodes)
+        p2 = resources_used(total_cpus_clocks_copy, vnf_placement, clocks)
+        p = plot(p1, p2, layout=(1, 2), legend=false, size=(1500, 700))
         display(p)
     end
+    p3 = system_performance(objective_values)
+    p4 = slices_deployed(number_nodes, number_cycles, traffic, VNFs_placements, Virtual_links, Clocks, Throughput, Rounds, number_uRLLC, number_eMBB, number_mMTC)
+    display(p3)
+    display(p4)
 end
 
-function substrate_visualization(longitude, latitude, adjacency_matrix, VNFs_placements, Virtual_links, failed_centers)
+function slices_deployed(number_nodes, number_cycles, traffic, VNFs_placements, Virtual_links, Clocks, Throughput, Rounds, number_uRLLC, number_eMBB, number_mMTC)
+    p = plot()
+    deployed_uRLLC, deployed_eMBB, deployed_mMTC = [0 for _ in 1: number_nodes], [0 for _ in 1: number_nodes], [0 for _ in 1: number_nodes]
+    for (round_index, _) in enumerate(Rounds)
+        clocks = Clocks[round_index]
+        throughput = Throughput[round_index]
+        vnf_placement = VNFs_placements[round_index]
+        virtual_link = Virtual_links[round_index]
+        for s in 1: number_uRLLC + number_eMBB + number_mMTC
+            delay = compute_delay(number_cycles, traffic, vnf_placement, virtual_link, clocks, throughput, s)
+            if 1 <= s < number_uRLLC + 1 && delay < 1
+                deployed_uRLLC[round_index] += 1
+            end
+            if number_uRLLC + 1 <= s < number_uRLLC + number_eMBB + 1 && delay < 10
+                deployed_eMBB[round_index] += 1
+            end
+            if number_uRLLC + number_eMBB + 1 <= s <= number_uRLLC + number_eMBB + number_mMTC && delay < 10
+                deployed_mMTC[round_index] += 1
+            end
+        end
+    end
+    x = range(1, number_nodes)
+    plot!(p, x, deployed_uRLLC, label="uRLLC", xlabel="Number of Failed Nodes")
+    plot!(p, x, deployed_eMBB, label="eMBB")
+    plot!(p, x, deployed_mMTC, label="uRLLC")
+    return p
+end
+
+function system_performance(objective_values)
+    p = plot()  
+    for (index, value) in enumerate(objective_values[1:end-1])
+        horizontal_x = [index - 1, index]
+        horizontal_y = [value, value]
+        plot!(p, horizontal_x, horizontal_y, seriestype=:shape, color=:blue, linecolor=:blue)
+        vertical_x = [index, index]
+        vertical_y = [value, objective_values[index + 1]]
+        plot!(p, vertical_x, vertical_y, seriestype=:shape, color=:blue, linecolor=:blue)
+    end
+    return plot!(p, title="System Performance", xticks=[c for c in 1: length(objective_values)], xlabel="Number of failed Nodes", ylabel="Objective function", yticks=0:20:(120), size=((400, 400)), legend = false)
+end
+
+function get_color(index)
+    return ColorSchemes.tab20.colors[index]
+end
+
+function substrate_visualization(longitude, latitude, adjacency_matrix, VNFs_placements, Virtual_links, failed_nodes)
     number_slices, number_VNFs, number_nodes = size(VNFs_placements)
     jump = 3
     p = plot()  
-    # Plotting nodes and text labels
-    for c in 1: number_nodes
-        scatter!(p, [longitude[c]], [latitude[c]], [0], color=get_color(1), markersize=4, label="")
-    end
-    # Highlighting failed centers
-    for c in failed_centers
-        scatter!(p, [longitude[c + 1]], [latitude[c + 1]], [0], color=:black, markersize=4, label="")
-    end
     # Plotting edges
     for i in 1: number_nodes
         for j in i: number_nodes
@@ -91,10 +130,18 @@ function substrate_visualization(longitude, latitude, adjacency_matrix, VNFs_pla
             end
         end
     end
-    return plot(p, legend=false, xlabel="Longitude", ylabel="Latitude", zlabel="Slices", xticks=nothing, yticks=nothing, zticks=nothing)
+    # Plotting nodes and text labels
+    for c in 1: number_nodes
+        scatter!(p, [longitude[c]], [latitude[c]], [0], color=get_color(1), markersize=4, label="")
+    end
+    # Highlighting failed centers
+    for c in failed_nodes
+        scatter!(p, [longitude[c]], [latitude[c]], [0], color=:black, markersize=4, label="")
+    end
+    return plot!(p, legend=false, title="Physical Substrate", xlabel="Longitude", ylabel="Latitude", zlabel="Slices", xticks=nothing, yticks=nothing, zticks=nothing)
 end
 
-function system_performance(total_cpus_clocks, VNFs_placements, cycles)
+function resources_used(total_cpus_clocks, VNFs_placements, clocks)
     p = plot()  
     number_slices, number_VNFs, number_nodes = size(VNFs_placements)
     nodes_x = [[x - 0.45, x + 0.45] for x in 1: number_nodes]
@@ -102,9 +149,9 @@ function system_performance(total_cpus_clocks, VNFs_placements, cycles)
     for s in 1: number_slices
         for k in 1: number_VNFs
             for c in 1: number_nodes
-                if VNFs_placements[s, k, c] == 1
+                if VNFs_placements[s, k, c] == 1 && total_cpus_clocks[c] != 0
                     x = [nodes_x[c][1], nodes_x[c][2], nodes_x[c][2], nodes_x[c][1]]
-                    added_height =  cycles[s, k] * 100 / total_cpus_clocks[c]
+                    added_height =  clocks[s, k]
                     y = [curr_height[c], curr_height[c], curr_height[c] + added_height, curr_height[c] + added_height] 
                     plot!(p, x, y, seriestype=:shape, color=get_color(2 * s + 1))
                     curr_height[c] += added_height
@@ -114,11 +161,10 @@ function system_performance(total_cpus_clocks, VNFs_placements, cycles)
     end
     for c in 1: number_nodes
         x = [nodes_x[c][1], nodes_x[c][2], nodes_x[c][2], nodes_x[c][1]]
-        y = [curr_height[c], curr_height[c], 100, 100] 
-        plot!(p, x, y, seriestype=:shape, color=:gray)
+        y = [curr_height[c], curr_height[c], total_cpus_clocks[c], total_cpus_clocks[c]] 
+        plot!(p, x, y, seriestype=:shape, color=:black)
     end
-    plot!(title="Consumed CPU cycles", xticks=[c for c in 1: number_nodes], xtick_labels=["Node $(c)" for c in 1: number_nodes], yticks=0:20:(120), size=((400, 400)))
-    return p
+    return plot!(p, title="Consumed CPU clocks per VNF", xticks=[c for c in 1: number_nodes], ylim=(0, 0.5), xtick_labels=["Node $(c)" for c in 1: number_nodes], yticks=0:20:(120), size=((400, 400)))
 end
 
-system_visualization()
+# system_visualization()

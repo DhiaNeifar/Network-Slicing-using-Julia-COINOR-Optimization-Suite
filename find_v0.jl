@@ -2,7 +2,7 @@ using JuMP, AmplNLWriter, HiGHS, MathOptInterface
 const MOI = MathOptInterface
 
 
-function find_v0(number_slices, number_nodes, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, delay_tolerance)
+function find_v0(number_slices, number_nodes, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, delay_tolerance, number_failed_nodes, β)
     
     model = Model(HiGHS.Optimizer)
     set_silent(model)
@@ -24,12 +24,14 @@ function find_v0(number_slices, number_nodes, total_cpus_clocks, adjacency_matri
             end
         end
     end
+    clocks = [0.000001 for _ in 1: number_slices, _ in 1: number_VNFs]
+    throughput = [0.0001 for _ in 1: number_slices, _ in 1: number_VNFs - 1]
 
-    initial_clocks = [0.05 for _ in 1: number_slices, _ in 1: number_VNFs]
-    initial_throughput = [0.05 for _ in 1: number_slices, _ in 1: number_VNFs - 1]
-    slices_deployed = [100 for _ in 1: number_slices]
-    @objective(model, Min, sum(sum(initial_clocks[s, k] * VNFs_placements[s, k, c] for k in 1: number_VNFs for c in 1: number_nodes) + 
-    sum(initial_throughput[s, k] * Virtual_links[s, k, i, j] for k in 1: number_VNFs - 1 for i in 1: number_nodes for j in 1: number_nodes) + slices_deployed[s]  for s in 1: number_slices)) 
+    @objective(model, Min, sum(β[s, 1] * (sum(clocks[s, k] * VNFs_placements[s, k, c] for k in 1: number_VNFs for c in 1: number_nodes) + 
+    sum(throughput[s, k] * Virtual_links[s, k, i, j] for k in 1: number_VNFs - 1 for i in 1: number_nodes for j in 1: number_nodes)) + 
+    β[s, 2] * (10 ^ -6 * sum(number_cycles[s, k] / clocks[s, k] * VNFs_placements[s, k, c] for k in 1: number_VNFs for c in 1: number_nodes) + 
+    10 ^ -3 * sum(traffic[s, k] / throughput[s, k] * Virtual_links[s, k, i, j] for k in 1: number_VNFs - 1 for i in 1: number_nodes for j in 1: number_nodes))
+    for s in 1: number_slices)) 
 
     # Constraints
 
@@ -44,12 +46,12 @@ function find_v0(number_slices, number_nodes, total_cpus_clocks, adjacency_matri
     # Constraint 2: Each VNF is assigned to an exactly one center.
     for s in 1: number_slices
         for c in 1: number_nodes
-            @constraint(model, sum(VNFs_placements[s, k, c] for k in 1: number_VNFs) <= 1)
+            @constraint(model, sum(VNFs_placements[s, k, c] for k in 1: number_VNFs) <= ceil(div(number_VNFs, max(1, (number_nodes - number_failed_nodes)))) + 1)
         end
     end
     # Constraint 3: Guarantee that allocated VNF resources do not exceed physical servers' processing capacity.
     for c in 1: number_nodes
-        @constraint(model, sum(VNFs_placements[s, k, c] * initial_clocks[s, k] for s in 1: number_slices, k in 1: number_VNFs) <= total_cpus_clocks[c])
+        @constraint(model, sum(VNFs_placements[s, k, c] * clocks[s, k] for s in 1: number_slices, k in 1: number_VNFs) <= total_cpus_clocks[c])
     end
 
     # Link Embedding Constraints
@@ -62,19 +64,19 @@ function find_v0(number_slices, number_nodes, total_cpus_clocks, adjacency_matri
             end
         end
     end
-    # Constraint 2: Guarantee that allocated throughput resources do not exceed physical links' throughput capacity.
+    # Constraint 3: Guarantee that allocated throughput resources do not exceed physical links' throughput capacity.
     for i in 1: number_nodes
         for j in 1: number_nodes
-            @constraint(model, sum(Virtual_links[s, k, i, j] * initial_throughput[s, k] for s in 1: number_slices, k in 1: number_VNFs - 1) <= total_throughput[i, j])
+            @constraint(model, sum(Virtual_links[s, k, i, j] * throughput[s, k] for s in 1: number_slices, k in 1: number_VNFs - 1) <= total_throughput[i, j])
         end
     end
 
     # Delay Constraints
     # Constraint 1: Total delay of a slice cannot exceed delay tolerance.
-    for s in 1: number_slices
-        @constraint(model, 10 ^ -6 * sum(number_cycles[s] / initial_clocks[s, k] * VNFs_placements[s, k, c] for k in 1: number_VNFs for c in 1: number_nodes) + 10 ^ -3 *
-        sum(traffic[s] / initial_throughput[s, k] * Virtual_links[s, k, i, j] for k in 1: number_VNFs - 1 for i in 1: number_nodes for j in 1: number_nodes) <= delay_tolerance[s] * slices_deployed[s])
-    end
+    # for s in 1: number_slices
+    #     @constraint(model, sum(number_cycles[s, k] / clocks[s, k] * VNFs_placements[s, k, c] for k in 1: number_VNFs for c in 1: number_nodes) + 
+    #     sum(traffic[s, k] / initial_throughput[s, k] * Virtual_links[s, k, i, j] for k in 1: number_VNFs - 1 for i in 1: number_nodes for j in 1: number_nodes) <= delay_tolerance[s])
+    # end
     
     # Solve the problem
     optimize!(model)
@@ -106,5 +108,5 @@ function find_v0(number_slices, number_nodes, total_cpus_clocks, adjacency_matri
             end
         end
     end
-    return vnf_placement_values, virtual_link_values
+    return objective_value(model), vnf_placement_values, virtual_link_values
 end
