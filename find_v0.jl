@@ -2,7 +2,7 @@ using JuMP, AmplNLWriter, HiGHS, MathOptInterface
 const MOI = MathOptInterface
 
 
-function find_v0(number_slices, number_nodes, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, delay_tolerance, number_failed_nodes, β)
+function find_v0(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, distribution, β)
     
     model = Model(HiGHS.Optimizer)
     set_silent(model)
@@ -46,12 +46,12 @@ function find_v0(number_slices, number_nodes, total_cpus_clocks, adjacency_matri
     # Constraint 2: Each VNF is assigned to an exactly one center.
     for s in 1: number_slices
         for c in 1: number_nodes
-            @constraint(model, sum(VNFs_placements[s, k, c] for k in 1: number_VNFs) <= ceil(div(number_VNFs, max(1, (number_nodes - number_failed_nodes)))) + 1)
+            @constraint(model, sum(VNFs_placements[s, k, c] for k in 1: number_VNFs) <= distribution)
         end
     end
     # Constraint 3: Guarantee that allocated VNF resources do not exceed physical servers' processing capacity.
     for c in 1: number_nodes
-        @constraint(model, sum(VNFs_placements[s, k, c] * clocks[s, k] for s in 1: number_slices, k in 1: number_VNFs) <= total_cpus_clocks[c])
+        @constraint(model, sum(VNFs_placements[s, k, c] * clocks[s, k] for s in 1: number_slices, k in 1: number_VNFs) <= total_cpus_clocks[c] * nodes_state[c])
     end
 
     # Link Embedding Constraints
@@ -70,13 +70,6 @@ function find_v0(number_slices, number_nodes, total_cpus_clocks, adjacency_matri
             @constraint(model, sum(Virtual_links[s, k, i, j] * throughput[s, k] for s in 1: number_slices, k in 1: number_VNFs - 1) <= total_throughput[i, j])
         end
     end
-
-    # Delay Constraints
-    # Constraint 1: Total delay of a slice cannot exceed delay tolerance.
-    # for s in 1: number_slices
-    #     @constraint(model, sum(number_cycles[s, k] / clocks[s, k] * VNFs_placements[s, k, c] for k in 1: number_VNFs for c in 1: number_nodes) + 
-    #     sum(traffic[s, k] / initial_throughput[s, k] * Virtual_links[s, k, i, j] for k in 1: number_VNFs - 1 for i in 1: number_nodes for j in 1: number_nodes) <= delay_tolerance[s])
-    # end
     
     # Solve the problem
     optimize!(model)

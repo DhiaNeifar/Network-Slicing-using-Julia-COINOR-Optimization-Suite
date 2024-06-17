@@ -1,141 +1,61 @@
-using JuMP, AmplNLWriter, Ipopt, MathOptInterface
-const MOI = MathOptInterface
+include("GBD.jl")
+include("utils.jl")
+include("system_visualization.jl")
+include("recovery.jl")
 
-function bump(x::Float64, z0::Float64, z1::Float64)
-    if x < z0
-        return 1.0
-    elseif x < z1
-        return 0.5 * cos(pi * (x - z0) / (z0 - z1))
-    else
-        return 0.0
+function main()
+    number_nodes = 4
+    number_nodes, total_cpus_clocks, _, _, adjacency_matrix, total_throughput = physical_substrate(number_nodes)
+    number_slices = 8
+    number_VNFs = 6
+    number_uRLLC, number_eMBB, number_mMTC, number_cycles, traffic, _, β = slice_instantiation(number_slices, number_VNFs)
+    nodes_state, recovery_resources, node_recovery_requirements = recovery(number_nodes)
+    VNFs_placements = []
+    Virtual_links = []
+    Clocks = []
+    Throughput = []
+    Failed_nodes = []
+    Objective_values = []
+    for number_failed_nodes in 0: number_nodes - 1
+        println("Number of Failed Nodes $(number_failed_nodes)")
+        failed_nodes = []
+        nodes_state_copy = copy(nodes_state)
+        if number_failed_nodes != 0
+            failed_nodes = shuffle(1: number_nodes)[1: number_failed_nodes]    
+            for failed_node in failed_nodes
+                nodes_state_copy[failed_node] = 0
+            end
+        end
+        distribution = virtual_nodes_distribution(number_VNFs, number_nodes, number_failed_nodes)
+        objective_value, vnf_placement, virtual_link, clocks, throughput = GBD(number_slices, number_nodes, nodes_state_copy, total_cpus_clocks, adjacency_matrix, total_throughput, 
+        number_VNFs, number_cycles, traffic, distribution, β, number_failed_nodes, recovery_resources, node_recovery_requirements)
+        push!(VNFs_placements, vnf_placement)
+        push!(Virtual_links, virtual_link)
+        push!(Clocks, clocks)
+        push!(Throughput, throughput)
+        push!(Failed_nodes, failed_nodes)
+        push!(Objective_values, objective_value)
+        # println(total_cpus_clocks_copy)
+        # display_solution(vnf_placement, virtual_link)
+        # println("slices deployed: $(slices_deployed)")
     end
+    system_visualization(total_cpus_clocks, Clocks, VNFs_placements, Throughput, Virtual_links, number_uRLLC, number_eMBB, number_mMTC, Failed_nodes, number_cycles, traffic, Objective_values)
+    # data = Dict(
+    # "total_cpus_clocks" => total_cpus_clocks,
+    # "number_cycles" => number_cycles, 
+    # "clocks" => Clocks, 
+    # "vnf_placement" => VNFs_placements,
+    # "number_uRLLC" => number_uRLLC,
+    # "number_eMBB" => number_eMBB,
+    # "number_mMTC" => number_mMTC,
+    # "delay_tolerance" => delay_tolerance, 
+    # "total_throughput" => total_throughput,
+    # "throughput" => Throughput,
+    # "virtual_link" => Virtual_links,
+    # "failed_nodes" => Failed_nodes,
+    # "objective_value" => objective_value,
+    # )
+    # save_results(data)
 end
 
-function network_slicing(number_slices, total_number_centers, total_available_cpus, edges_adjacency_matrix, total_available_bandwidth, edges_delay, number_VNFs, required_cpus, required_bandwidth, delay_tolerance, failed_centers)
-   
-    model = Model(Ipopt.Optimizer)
-    JuMP.register(model, :bump, 3, bump; autodiff = true)
-
-    VNFs_placements = Array{VariableRef, 3}(undef, number_slices, number_VNFs, total_number_centers)
-    for s in 1: number_slices
-        for c in 1: total_number_centers
-            for k in 1: number_VNFs
-                VNFs_placements[s, k, c] = @variable(model, base_name="slice_$(s)_center_$(c)_VNF_$(k)", lower_bound=0, upper_bound=1)
-            end
-        end
-    end
-    assigned_cpus = Array{VariableRef, 2}(undef, number_slices, number_VNFs)
-    for s in 1: number_slices
-        for k in 1: number_VNFs
-            assigned_cpus[s, k] = @variable(model, base_name="assigned_cpus_slice_$(s)_VNF_$(k)", lower_bound=1, upper_bound=required_cpus[s, k], start = required_cpus[s, k])
-        end
-    end
-    Virtual_links = Array{VariableRef, 4}(undef, number_slices, number_VNFs - 1, total_number_centers, total_number_centers)
-    for s in 1: number_slices
-        for k in 1: number_VNFs - 1
-            for i in 1: total_number_centers
-                for j in 1: total_number_centers
-                    Virtual_links[s, k, i, j] = @variable(model, base_name="slice_$(s)_VL$(k)_to_VL$(k + 1)_PN$(i)_to_PN$(j)", lower_bound=0, upper_bound=1)
-                end
-            end
-        end
-    end
-    @NLobjective(model, Max, 100 * sum(log(1 + (assigned_cpus[s, k] * VNFs_placements[s, k, c]) / required_cpus[s, k])
-    for s in 1: number_slices 
-        for k in 1: number_VNFs 
-            for c in 1: total_number_centers)
-                - 1 / (number_slices * number_VNFs * total_number_centers) * sum(100 * sin(VNFs_placements[s, k, c] * pi)
-                for s in 1: number_slices 
-                    for k in 1: number_VNFs 
-                        for c in 1: total_number_centers)
-                            + sum(bump(sum(Virtual_links[s, k, i, j] * edges_delay[i ,j] for k in 1: number_VNFs - 1 for i in 1: total_number_centers for j in 1: total_number_centers), delay_tolerance[s], 2 * delay_tolerance[s]) for s in 1: number_slices) 
-                            - 1 / (number_slices * number_VNFs * total_number_centers * total_number_centers) * sum(sin(Virtual_links[s, k, i, j] * pi)
-                            for s in 1: number_slices 
-                                for k in 1: number_VNFs - 1 
-                                    for i in 1: total_number_centers 
-                                        for j in 1: total_number_centers))
-
-    # Constraints
-
-    # Node Embedding Constraints
-    # Constraint 1: Each VNF is assigned only once to a center.
-    for s in 1: number_slices
-        for k in 1: number_VNFs
-            @constraint(model, sum(VNFs_placements[s, k, c] for c in 1:total_number_centers) == 1)
-        end
-    end
-    
-    # Constraint 2: Each VNF is assigned to an exactly one center.
-    for s in 1: number_slices
-        for c in 1: total_number_centers
-            @constraint(model, sum(VNFs_placements[s, k, c] for k in 1: number_VNFs) <= ceil(div(number_VNFs, max(1, (total_number_centers - 1 - length(failed_centers))))) + 1)
-        end
-    end
-    # Constraint 3: Guarantee that allocated VNF resources do not exceed physical servers' processing capacity.
-    for c in 1: total_number_centers
-        @constraint(model, sum(VNFs_placements[s, k, c] * assigned_cpus[s, k] for s in 1: number_slices, k in 1: number_VNFs) <= total_available_cpus[c])
-    end
-
-    # Link Embedding Constraints
-    # Constraint 2: Flow Conservation Constraint
-    for s in 1: number_slices
-        for i in 1: total_number_centers
-            for k in 1: number_VNFs - 1
-                @constraint(model, sum(Virtual_links[s, k, i, j] * edges_adjacency_matrix[i, j] for j in 1: total_number_centers) - 
-                sum(Virtual_links[s, k, j, i] * edges_adjacency_matrix[j ,i] for j in 1: total_number_centers) == VNFs_placements[s, k, i] - VNFs_placements[s, k + 1, i])
-            end
-        end
-    end
-    # Constraint 3: Guarantee that allocated throughput resources do not exceed physical links' throughput capacity.
-    for i in 1: total_number_centers
-        for j in 1: total_number_centers
-            @constraint(model, sum(Virtual_links[s, k, i, j] * required_bandwidth[s, k] for s in 1: number_slices, k in 1: number_VNFs - 1) <= total_available_bandwidth[i, j])
-        end
-    end
-
-    # Solve the problem
-    optimize!(model)
-    status = termination_status(model)
-    if status == MOI.OPTIMAL
-        println("An optimal solution has been found!")
-    elseif status == MOI.INFEASIBLE
-        println("The problem is infeasible.")
-    else
-        println("The solver stopped with status: $status")
-    end
-
-    # Extract Results Values
-    vnf_placement_values = Array{Int, 3}(undef, number_slices, number_VNFs, total_number_centers)
-    for s in 1: number_slices
-        for k in 1: number_VNFs
-            for c in 1: total_number_centers
-                if value(VNFs_placements[s, k, c]) > 0.5
-                    vnf_placement_values[s, k, c] = 1
-                else
-                    vnf_placement_values[s, k, c] = 0
-                end 
-            end
-        end
-    end
-    assigned_cpus_values = Array{Float32, 2}(undef, number_slices, number_VNFs)
-    for s in 1: number_slices
-        for k in 1: number_VNFs
-            assigned_cpus_values[s, k] = value(assigned_cpus[s, k])
-        end
-    end
-    virtual_link_values = Array{Int, 4}(undef, number_slices, number_VNFs - 1, total_number_centers, total_number_centers)
-    for s in 1: number_slices
-        for k in 1: (number_VNFs - 1)
-            for i in 1: total_number_centers
-                for j in 1: total_number_centers
-                    if value(Virtual_links[s, k, i, j]) > 0.5
-                        virtual_link_values[s, k, i, j] = 1
-                    else 
-                        virtual_link_values[s, k, i, j] = 0
-                    end
-                end
-            end
-        end
-    end
-    return vnf_placement_values, assigned_cpus_values, virtual_link_values
-end
+main()

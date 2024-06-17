@@ -110,3 +110,9 @@ function compute_delay(number_cycles, traffic, VNFs_placements, Virtual_links, c
     10 ^ -3 * sum(traffic[s] / throughput[s, k] * Virtual_links[s, k, i, j] for k in 1: number_VNFs - 1 for i in 1: number_nodes for j in 1: number_nodes)
     return delay
 end
+
+
+function virtual_nodes_distribution(number_VNFs, number_nodes, number_failed_nodes)
+    available_nodes = number_nodes - number_failed_nodes
+    return number_VNFs <= available_nodes ? 1 : ceil(number_VNFs / available_nodes)
+end
