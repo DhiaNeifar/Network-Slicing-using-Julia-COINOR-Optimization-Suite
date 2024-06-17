@@ -28,7 +28,7 @@ function main()
         end
         distribution = virtual_nodes_distribution(number_VNFs, number_nodes, number_failed_nodes)
         objective_value, vnf_placement, virtual_link, clocks, throughput = GBD(number_slices, number_nodes, nodes_state_copy, total_cpus_clocks, adjacency_matrix, total_throughput, 
-        number_VNFs, number_cycles, traffic, distribution, β, number_failed_nodes, recovery_resources, node_recovery_requirements)
+        number_VNFs, number_cycles, traffic, distribution, β, recovery_resources, node_recovery_requirements)
         push!(VNFs_placements, vnf_placement)
         push!(Virtual_links, virtual_link)
         push!(Clocks, clocks)

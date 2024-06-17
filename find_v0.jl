@@ -2,6 +2,9 @@ using JuMP, AmplNLWriter, HiGHS, MathOptInterface
 const MOI = MathOptInterface
 
 
+include("utils.jl")
+
+
 function find_v0(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, distribution, β)
     
     model = Model(HiGHS.Optimizer)
@@ -27,11 +30,10 @@ function find_v0(number_slices, number_nodes, nodes_state, total_cpus_clocks, ad
     clocks = [0.000001 for _ in 1: number_slices, _ in 1: number_VNFs]
     throughput = [0.0001 for _ in 1: number_slices, _ in 1: number_VNFs - 1]
 
-    @objective(model, Min, sum(β[s, 1] * (sum(clocks[s, k] * VNFs_placements[s, k, c] for k in 1: number_VNFs for c in 1: number_nodes) + 
-    sum(throughput[s, k] * Virtual_links[s, k, i, j] for k in 1: number_VNFs - 1 for i in 1: number_nodes for j in 1: number_nodes)) + 
-    β[s, 2] * (10 ^ -6 * sum(number_cycles[s, k] / clocks[s, k] * VNFs_placements[s, k, c] for k in 1: number_VNFs for c in 1: number_nodes) + 
-    10 ^ -3 * sum(traffic[s, k] / throughput[s, k] * Virtual_links[s, k, i, j] for k in 1: number_VNFs - 1 for i in 1: number_nodes for j in 1: number_nodes))
-    for s in 1: number_slices)) 
+
+
+
+    @objective(model, Min, sum(Objective_function(s, number_nodes, number_VNFs, number_cycles, traffic, clocks, throughput, VNFs_placements, Virtual_links, β) for s in 1: number_slices)) 
 
     # Constraints
 

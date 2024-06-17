@@ -7,7 +7,7 @@ include("master_problem.jl")
 include("utils.jl")
 
 
-function GBD(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, distribution, β, number_failed_nodes, recovery_resources, node_recovery_requirements)
+function GBD(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, distribution, β, recovery_resources, node_recovery_requirements)
     
     # Initialization
     epsilon = 1e-3

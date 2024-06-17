@@ -30,12 +30,7 @@ function master_problem(number_slices, number_nodes, nodes_state, total_cpus_clo
     for (index, clocks) in enumerate(Clocks)
         throughput = Throughputs[index]
         λ = lambdas[index]
-        @constraint(model, sum(β[s, 1] * (sum(clocks[s, k] * VNFs_placements[s, k, c] for k in 1: number_VNFs for c in 1: number_nodes) + 
-        sum(throughput[s, k] * Virtual_links[s, k, i, j] for k in 1: number_VNFs - 1 for i in 1: number_nodes for j in 1: number_nodes)) + 
-        β[s, 2] * (10 ^ -6 * sum(number_cycles[s, k] / clocks[s, k] * VNFs_placements[s, k, c] for k in 1: number_VNFs for c in 1: number_nodes) + 10 ^ -3 * 
-        sum(traffic[s, k] / throughput[s, k] * Virtual_links[s, k, i, j] for k in 1: number_VNFs - 1 for i in 1: number_nodes for j in 1: number_nodes)) for s in 1: number_slices) + 
-        sum(-λ[c] * (sum(VNFs_placements[s, k, c] * clocks[s, k] for s in 1: number_slices, k in 1: number_VNFs) - total_cpus_clocks[c] * nodes_state[c]) for c in 1: number_nodes) + 
-        sum(-λ[number_nodes * i + j] * (sum(Virtual_links[s, k, i, j] * throughput[s, k] for s in 1: number_slices, k in 1: number_VNFs - 1) - total_throughput[i, j]) for i in 1: number_nodes for j in 1: number_nodes) <= mu)
+        @constraint(model, master_objective_function(number_slices, number_nodes, nodes_state, total_cpus_clocks, total_throughput, number_VNFs, number_cycles, traffic, clocks, throughput, VNFs_placements, Virtual_links, λ, β) <= mu)
     end
 
     # Node Embedding Constraints
