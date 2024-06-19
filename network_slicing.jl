@@ -4,7 +4,7 @@ include("system_visualization.jl")
 include("recovery.jl")
 
 function main()
-    number_nodes = 4
+    number_nodes = 10
     number_nodes, total_cpus_clocks, _, _, adjacency_matrix, total_throughput = physical_substrate(number_nodes)
     number_slices = 8
     number_VNFs = 6

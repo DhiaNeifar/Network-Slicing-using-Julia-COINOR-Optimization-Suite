@@ -56,8 +56,8 @@ function master_problem(number_slices, number_nodes, nodes_state, total_cpus_clo
     for s in 1: number_slices
         for i in 1: number_nodes
             for k in 1: number_VNFs - 1
-                @constraint(model, sum(Virtual_links[s, k, i, j] for j in 1: number_nodes) - 
-                sum(Virtual_links[s, k, j, i] for j in 1: number_nodes) == VNFs_placements[s, k, i] - VNFs_placements[s, k + 1, i])
+                @constraint(model, sum(Virtual_links[s, k, i, j] for j in 1: number_nodes if adjacency_matrix[i, j] == 1) - 
+                sum(Virtual_links[s, k, j, i] for j in 1: number_nodes if adjacency_matrix[i, j] == 1) == VNFs_placements[s, k, i] - VNFs_placements[s, k + 1, i])
             end
         end
     end

@@ -8,7 +8,7 @@ include("utils.jl")
 function find_v0(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, distribution, β)
     
     model = Model(HiGHS.Optimizer)
-    set_silent(model)
+    # set_silent(model)
     VNFs_placements = Array{VariableRef, 3}(undef, number_slices, number_VNFs, number_nodes)
     for s in 1: number_slices
         for k in 1: number_VNFs
@@ -31,7 +31,7 @@ function find_v0(number_slices, number_nodes, nodes_state, total_cpus_clocks, ad
         end
     end
     clocks = [0.000001 for _ in 1: number_slices, _ in 1: number_VNFs]
-    throughput = [0.0001 for _ in 1: number_slices, _ in 1: number_VNFs - 1]
+    throughput = [1 for _ in 1: number_slices, _ in 1: number_VNFs - 1]
 
 
 
@@ -64,8 +64,8 @@ function find_v0(number_slices, number_nodes, nodes_state, total_cpus_clocks, ad
     for s in 1: number_slices
         for i in 1: number_nodes
             for k in 1: number_VNFs - 1
-                @constraint(model, sum(Virtual_links[s, k, i, j] for j in 1: number_nodes) - 
-                sum(Virtual_links[s, k, j, i] for j in 1: number_nodes) == VNFs_placements[s, k, i] - VNFs_placements[s, k + 1, i])
+                @constraint(model, sum(Virtual_links[s, k, i, j] for j in 1: number_nodes if adjacency_matrix[i, j] == 1) - 
+                sum(Virtual_links[s, k, j, i] for j in 1: number_nodes if adjacency_matrix[i, j] == 1) == VNFs_placements[s, k, i] - VNFs_placements[s, k + 1, i])
             end
         end
     end
