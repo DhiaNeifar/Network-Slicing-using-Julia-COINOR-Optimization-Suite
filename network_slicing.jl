@@ -1,15 +1,14 @@
 include("GBD.jl")
 include("utils.jl")
 include("system_visualization.jl")
-include("recovery.jl")
+include("recovery_resources.jl")
 
 function main()
-    number_nodes = 10
+    number_nodes = 4
     number_nodes, total_cpus_clocks, _, _, adjacency_matrix, total_throughput = physical_substrate(number_nodes)
     number_slices = 8
     number_VNFs = 6
     number_uRLLC, number_eMBB, number_mMTC, number_cycles, traffic, _, β = slice_instantiation(number_slices, number_VNFs)
-    nodes_state, recovery_resources, node_recovery_requirements = recovery(number_nodes)
     VNFs_placements = []
     Virtual_links = []
     Clocks = []
@@ -26,9 +25,8 @@ function main()
                 nodes_state_copy[failed_node] = 0
             end
         end
-        distribution = virtual_nodes_distribution(number_VNFs, number_nodes, number_failed_nodes)
         objective_value, vnf_placement, virtual_link, clocks, throughput = GBD(number_slices, number_nodes, nodes_state_copy, total_cpus_clocks, adjacency_matrix, total_throughput, 
-        number_VNFs, number_cycles, traffic, distribution, β, recovery_resources, node_recovery_requirements)
+        number_VNFs, number_cycles, traffic, β, recovery_resources, node_recovery_requirements)
         push!(VNFs_placements, vnf_placement)
         push!(Virtual_links, virtual_link)
         push!(Clocks, clocks)

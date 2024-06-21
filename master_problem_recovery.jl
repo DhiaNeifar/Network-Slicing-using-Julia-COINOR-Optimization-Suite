@@ -1,14 +1,10 @@
 using JuMP, AmplNLWriter, HiGHS, MathOptInterface
-const MOI = MathOptInterface
 
 
-include("utils.jl")
-
-
-function find_v0(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, distribution, β)
-    
+function master_problem_recovery(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, Clocks, Throughputs, lambdas, β, nodes_recovery_resources, node_recovery_requirements)
     model = Model(HiGHS.Optimizer)
     set_silent(model)
+    mu = @variable(model, base_name="auxiliary_variable")
     VNFs_placements = Array{VariableRef, 3}(undef, number_slices, number_VNFs, number_nodes)
     for s in 1: number_slices
         for k in 1: number_VNFs
@@ -30,15 +26,19 @@ function find_v0(number_slices, number_nodes, nodes_state, total_cpus_clocks, ad
             end
         end
     end
-    clocks = [0.000001 for _ in 1: number_slices, _ in 1: number_VNFs]
-    throughput = [1 for _ in 1: number_slices, _ in 1: number_VNFs - 1]
+    Recovery_states = Array{VariableRef, 1}(undef, number_nodes)
+    for c in 1: number_nodes
+        Recovery_states[c] = @variable(model, base_name="recovered_$(c))", lower_bound=0)
+    end
 
-
-
-
-    @objective(model, Min, sum(Objective_function(s, number_nodes, number_VNFs, number_cycles, traffic, clocks, throughput, VNFs_placements, Virtual_links, β) for s in 1: number_slices)) 
-
+    @objective(model, Min, mu)
+    
     # Constraints
+    for (index, clocks) in enumerate(Clocks)
+        throughput = Throughputs[index]
+        λ = lambdas[index]
+        @constraint(model, recovery_master_objective_function(number_slices, number_nodes, nodes_state, total_cpus_clocks, total_throughput, number_VNFs, number_cycles, traffic, clocks, throughput, VNFs_placements, Virtual_links, Recovery_states, λ, β) <= mu)
+    end
 
     # Node Embedding Constraints
     # Constraint 1: Each VNF is assigned only once to a center.
@@ -54,10 +54,6 @@ function find_v0(number_slices, number_nodes, nodes_state, total_cpus_clocks, ad
             @constraint(model, sum(VNFs_placements[s, k, c] for k in 1: number_VNFs) <= 1)
         end
     end
-    # Constraint 3: Guarantee that allocated VNF resources do not exceed physical servers' processing capacity.
-    for c in 1: number_nodes
-        @constraint(model, sum(VNFs_placements[s, k, c] * clocks[s, k] for s in 1: number_slices, k in 1: number_VNFs) <= total_cpus_clocks[c] * nodes_state[c])
-    end
 
     # Link Embedding Constraints
     # Constraint 1: Flow Conservation Constraint
@@ -69,13 +65,17 @@ function find_v0(number_slices, number_nodes, nodes_state, total_cpus_clocks, ad
             end
         end
     end
-    # Constraint 3: Guarantee that allocated throughput resources do not exceed physical links' throughput capacity.
-    for i in 1: number_nodes
-        for j in 1: number_nodes
-            @constraint(model, sum(Virtual_links[s, k, i, j] * throughput[s, k] for s in 1: number_slices, k in 1: number_VNFs - 1) <= total_throughput[i, j])
-        end
+
+    # Recovery Constraints
+    # Constraint 1: State of a node does not exceed one.
+    for c in 1: number_nodes
+        @constraint(model, nodes_state[c] + Recovery_states[c] <= 1)
     end
-    
+    # Constraint 2: Recovery resources used does not exceed available.
+    for c in 1: number_nodes
+        @constraint(model, node_recovery_requirements[c] * Recovery_states[c] <= nodes_recovery_resources)
+    end
+
     # Solve the problem
     optimize!(model)
 
@@ -106,5 +106,9 @@ function find_v0(number_slices, number_nodes, nodes_state, total_cpus_clocks, ad
             end
         end
     end
-    return objective_value(model), vnf_placement_values, virtual_link_values
+    recovery_states_values = Array{Float32, 1}(undef, number_nodes)
+    for c in 1: number_nodes
+        recovery_states_values[c] = value(Recovery_states[c])
+    end
+    return vnf_placement_values, virtual_link_values, recovery_states_values, objective_value(model)
 end

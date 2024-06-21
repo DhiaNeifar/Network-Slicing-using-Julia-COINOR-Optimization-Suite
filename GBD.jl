@@ -7,10 +7,11 @@ include("master_problem.jl")
 include("utils.jl")
 
 
-function GBD(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, distribution, β, recovery_resources, node_recovery_requirements)
+function GBD(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, β)
     
     # Initialization
     epsilon = 1e-3
+    distribution = virtual_nodes_distribution(number_VNFs, number_nodes, 0)
     objective_value, vnf_placement, virtual_link = find_v0(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, distribution, β)
     # display_solution(vnf_placement, virtual_link)
     num_iter = 100

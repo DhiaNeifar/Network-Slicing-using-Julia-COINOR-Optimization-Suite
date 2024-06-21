@@ -8,33 +8,21 @@ include("physical_substrate.jl")
 include("utils.jl")
 
 
-function system_visualization(total_cpus_clocks, Clocks, VNFs_placements, Throughput, Virtual_links, number_uRLLC, number_eMBB, number_mMTC, Rounds, number_cycles, traffic, objective_values)
-    # data = load_data()
-    # total_cpus_clocks = data["total_cpus_clocks"]
-    # clocks = data["clocks"]
-    # VNFs_placements = data["vnf_placement"]
-    # Virtual_links = data["virtual_link"]
-    # Rounds = data["failed_nodes"]
-    # objective_values = data["objective_function"]
+function system_visualization(total_cpus_clocks, nodes_state, Clocks, VNFs_placements, Throughput, Virtual_links, number_uRLLC, number_eMBB, number_mMTC, failed_nodes, number_cycles, traffic, objective_values)
     number_nodes = size(total_cpus_clocks)[1]
     number_nodes, _, longitude, latitude, adjacency_matrix, _ = physical_substrate(number_nodes)
-    for (round_index, failed_nodes) in enumerate(Rounds)
-        total_cpus_clocks_copy = copy(total_cpus_clocks)
-        failed_nodes = Rounds[round_index]
-        vnf_placement = VNFs_placements[round_index] 
-        clocks = Clocks[round_index]
-        for node in failed_nodes
-            total_cpus_clocks_copy[node] = 0
-        end
-        p1 = substrate_visualization(longitude, latitude, adjacency_matrix, VNFs_placements[round_index], Virtual_links[round_index], failed_nodes)
-        p2 = resources_used(total_cpus_clocks_copy, vnf_placement, clocks)
-        p = plot(p1, p2, layout=(1, 2), legend=false, size=(1500, 700))
-        display(p)
+
+    for node in failed_nodes
+        total_cpus_clocks[node] *= nodes_state[node]
     end
-    p3 = system_performance(objective_values)
-    p4 = slices_deployed(number_nodes, number_cycles, traffic, VNFs_placements, Virtual_links, Clocks, Throughput, Rounds, number_uRLLC, number_eMBB, number_mMTC)
-    display(p3)
-    display(p4)
+    p1 = substrate_visualization(longitude, latitude, adjacency_matrix, VNFs_placements, Virtual_links, failed_nodes)
+    p2 = resources_used(total_cpus_clocks, VNFs_placements, Clocks)
+    p = plot(p1, p2, layout=(1, 2), legend=false, size=(1500, 700))
+    display(p)
+    # p3 = plotting_objective_value(objective_values)
+    # p4 = slices_deployed(number_nodes, number_cycles, traffic, VNFs_placements, Virtual_links, Clocks, Throughput, Rounds, number_uRLLC, number_eMBB, number_mMTC)
+    # display(p3)
+    # display(p4)
 end
 
 function slices_deployed(number_nodes, number_cycles, traffic, VNFs_placements, Virtual_links, Clocks, Throughput, Rounds, number_uRLLC, number_eMBB, number_mMTC)
@@ -65,7 +53,7 @@ function slices_deployed(number_nodes, number_cycles, traffic, VNFs_placements, 
     return p
 end
 
-function system_performance(objective_values)
+function plotting_objective_value(objective_values)
     p = plot()  
     for (index, value) in enumerate(objective_values[1:end-1])
         horizontal_x = [index - 1, index]
@@ -166,5 +154,3 @@ function resources_used(total_cpus_clocks, VNFs_placements, clocks)
     end
     return plot!(p, title="Consumed CPU clocks per VNF", xticks=[c for c in 1: number_nodes], ylim=(0, 0.5), xtick_labels=["Node $(c)" for c in 1: number_nodes], yticks=0:20:(120), size=((400, 400)))
 end
-
-# system_visualization()

@@ -47,7 +47,7 @@ function master_problem(number_slices, number_nodes, nodes_state, total_cpus_clo
     # Constraint 2: Each VNF is assigned to an exactly one center.
     for s in 1: number_slices
         for c in 1: number_nodes
-            @constraint(model, sum(VNFs_placements[s, k, c] for k in 1: number_VNFs) <= ceil(div(number_VNFs, max(1, sum(nodes_state)))) + 1)
+            @constraint(model, sum(VNFs_placements[s, k, c] for k in 1: number_VNFs) <= 1)
         end
     end
 
