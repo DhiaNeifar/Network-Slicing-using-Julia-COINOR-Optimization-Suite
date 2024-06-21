@@ -1,7 +1,7 @@
 using JuMP, AmplNLWriter, Ipopt, MathOptInterface
 
 
-function primal_problem_recovery(number_slices, number_nodes, nodes_state, total_cpus_clocks, total_throughput, number_VNFs, number_cycles, traffic, VNFs_placements, Virtual_links, recovery_states, β)
+function primal_problem_recovery(number_slices, number_nodes, nodes_state, total_cpus_clocks, total_throughput, number_VNFs, number_cycles, traffic, VNFs_placements, Virtual_links, nodes_recovery_resources, node_recovery_requirements, β)
     
     model = Model(Ipopt.Optimizer)
     set_silent(model)
@@ -17,8 +17,13 @@ function primal_problem_recovery(number_slices, number_nodes, nodes_state, total
             throughput[s, k] = @variable(model, base_name="throughput_slice_$(s)_VL$(k)_to_VL$(k + 1)", lower_bound=0)
         end
     end
-
-    @objective(model, Min, sum(Objective_function(s, number_nodes, number_VNFs, number_cycles, traffic, clocks, throughput, VNFs_placements, Virtual_links, β) for s in 1: number_slices)) 
+    Recovery_states = Array{VariableRef, 1}(undef, number_nodes)
+    for c in 1: number_nodes
+        Recovery_states[c] = @variable(model, base_name="recovered_$(c))", lower_bound=0)
+    end
+    
+    
+    @objective(model, Min, sum(objective_function(s, number_nodes, number_VNFs, number_cycles, traffic, clocks, throughput, VNFs_placements, Virtual_links, β) for s in 1: number_slices)) 
     
     # Constraints
     constraints = Dict{String, ConstraintRef}()
@@ -26,7 +31,7 @@ function primal_problem_recovery(number_slices, number_nodes, nodes_state, total
     # Constraint 1: Guarantee that allocated VNF resources do not exceed physical servers' processing capacity.
     for c in 1: number_nodes
         con_name = "Node$(c)_constraint"
-        constraints[con_name] = @constraint(model, sum(VNFs_placements[s, k, c] * clocks[s, k] for s in 1: number_slices, k in 1: number_VNFs) <= total_cpus_clocks[c] * (nodes_state[c] + recovery_states[c]))
+        constraints[con_name] = @constraint(model, sum(VNFs_placements[s, k, c] * clocks[s, k] for s in 1: number_slices, k in 1: number_VNFs) <= total_cpus_clocks[c] * (nodes_state[c] + Recovery_states[c]))
     end
 
     # Link Embedding Constraints
@@ -37,6 +42,17 @@ function primal_problem_recovery(number_slices, number_nodes, nodes_state, total
             constraints[con_name] = @constraint(model, sum(Virtual_links[s, k, i, j] * throughput[s, k] for s in 1: number_slices, k in 1: number_VNFs - 1) <= total_throughput[i, j])
         end
     end
+
+    # Recovery Constraints
+    # Constraint 1: State of a node does not exceed one.
+    for c in 1: number_nodes
+        con_name = "Recovery_state_$(c)_constraint"
+        constraints[con_name] = @constraint(model, nodes_state[c] + Recovery_states[c] <= 1)
+    end
+    # Constraint 2: Recovery resources used does not exceed available.
+    con_name = "Recovery_Resources_constraint"
+    constraints[con_name] = @constraint(model, sum(node_recovery_requirements[c] * Recovery_states[c] for c in 1: number_nodes) <= nodes_recovery_resources)
+
 
     # Solve the problem
     optimize!(model)
@@ -55,6 +71,10 @@ function primal_problem_recovery(number_slices, number_nodes, nodes_state, total
             throughput_values[s, k] = value(throughput[s, k])
         end
     end
+    recovery_states_values = Array{Float32, 1}(undef, number_nodes)
+    for c in 1: number_nodes
+        recovery_states_values[c] = value(Recovery_states[c])
+    end
 
     λ = []
     for c in 1: number_nodes
@@ -67,9 +87,12 @@ function primal_problem_recovery(number_slices, number_nodes, nodes_state, total
             push!(λ, dual(constraints[con_name]))
         end
     end
-    # for s in 1: number_slices
-    #     con_name = "Slice$(s)_delay_constraint"
-    #     push!(λ, dual(constraints[con_name]))
-    # end
-    return objective_value(model), clocks_values, throughput_values, λ
+    for c in 1: number_nodes
+        con_name = "Recovery_state_$(c)_constraint"
+        push!(λ, dual(constraints[con_name]))
+    end
+    con_name = "Recovery_Resources_constraint"
+    push!(λ, dual(constraints[con_name]))
+
+    return objective_value(model), clocks_values, throughput_values, recovery_states_values, λ
 end

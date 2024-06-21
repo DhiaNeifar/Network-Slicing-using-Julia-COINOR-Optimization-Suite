@@ -18,7 +18,7 @@ function primal_problem(number_slices, number_nodes, nodes_state, total_cpus_clo
         end
     end
 
-    @objective(model, Min, sum(Objective_function(s, number_nodes, number_VNFs, number_cycles, traffic, clocks, throughput, VNFs_placements, Virtual_links, β) for s in 1: number_slices)) 
+    @objective(model, Min, sum(objective_function(s, number_nodes, number_VNFs, number_cycles, traffic, clocks, throughput, VNFs_placements, Virtual_links, β) for s in 1: number_slices)) 
     
     # Constraints
     constraints = Dict{String, ConstraintRef}()

@@ -18,7 +18,7 @@ function elastic_resource_management(number_slices, number_nodes, nodes_state, t
         end
     end
 
-    @objective(model, Min, sum(Objective_function(s, number_nodes, number_VNFs, number_cycles, traffic, clocks, throughput, VNFs_placements, Virtual_links, β) for s in 1: number_slices)) 
+    @objective(model, Min, sum(objective_function(s, number_nodes, number_VNFs, number_cycles, traffic, clocks, throughput, VNFs_placements, Virtual_links, β) for s in 1: number_slices)) 
     
     # Constraints
     constraints = Dict{String, ConstraintRef}()

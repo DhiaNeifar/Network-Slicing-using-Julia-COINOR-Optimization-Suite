@@ -8,7 +8,7 @@ include("physical_substrate.jl")
 include("utils.jl")
 
 
-function system_visualization(total_cpus_clocks, nodes_state, Clocks, VNFs_placements, Throughput, Virtual_links, number_uRLLC, number_eMBB, number_mMTC, failed_nodes, number_cycles, traffic, objective_values)
+function system_visualization(total_cpus_clocks, nodes_state, Clocks, VNFs_placements, Throughput, Virtual_links, number_uRLLC, number_eMBB, number_mMTC, failed_nodes, number_cycles, traffic, objective_values, consumed_recovery_resources, nodes_recovery_resources, title)
     number_nodes = size(total_cpus_clocks)[1]
     number_nodes, _, longitude, latitude, adjacency_matrix, _ = physical_substrate(number_nodes)
 
@@ -16,8 +16,8 @@ function system_visualization(total_cpus_clocks, nodes_state, Clocks, VNFs_place
         total_cpus_clocks[node] *= nodes_state[node]
     end
     p1 = substrate_visualization(longitude, latitude, adjacency_matrix, VNFs_placements, Virtual_links, failed_nodes)
-    p2 = resources_used(total_cpus_clocks, VNFs_placements, Clocks)
-    p = plot(p1, p2, layout=(1, 2), legend=false, size=(1500, 700))
+    p2 = resources_used(total_cpus_clocks, VNFs_placements, Clocks, consumed_recovery_resources, nodes_recovery_resources)
+    p = plot(p1, p2, layout=(1, 2), legend=false, size=(1500, 700), title=title)
     display(p)
     # p3 = plotting_objective_value(objective_values)
     # p4 = slices_deployed(number_nodes, number_cycles, traffic, VNFs_placements, Virtual_links, Clocks, Throughput, Rounds, number_uRLLC, number_eMBB, number_mMTC)
@@ -129,10 +129,10 @@ function substrate_visualization(longitude, latitude, adjacency_matrix, VNFs_pla
     return plot!(p, legend=false, title="Physical Substrate", xlabel="Longitude", ylabel="Latitude", zlabel="Slices", xticks=nothing, yticks=nothing, zticks=nothing)
 end
 
-function resources_used(total_cpus_clocks, VNFs_placements, clocks)
+function resources_used(total_cpus_clocks, VNFs_placements, clocks, consumed_recovery_resources, nodes_recovery_resources)
     p = plot()  
     number_slices, number_VNFs, number_nodes = size(VNFs_placements)
-    nodes_x = [[x - 0.45, x + 0.45] for x in 1: number_nodes]
+    nodes_x = [[x - 0.45, x + 0.45] for x in 1: number_nodes + 1]
     curr_height = zeros(number_nodes)
     for s in 1: number_slices
         for k in 1: number_VNFs
@@ -147,10 +147,28 @@ function resources_used(total_cpus_clocks, VNFs_placements, clocks)
             end
         end
     end
+    # Left resources
     for c in 1: number_nodes
         x = [nodes_x[c][1], nodes_x[c][2], nodes_x[c][2], nodes_x[c][1]]
         y = [curr_height[c], curr_height[c], total_cpus_clocks[c], total_cpus_clocks[c]] 
         plot!(p, x, y, seriestype=:shape, color=:black)
     end
-    return plot!(p, title="Consumed CPU clocks per VNF", xticks=[c for c in 1: number_nodes], ylim=(0, 0.5), xtick_labels=["Node $(c)" for c in 1: number_nodes], yticks=0:20:(120), size=((400, 400)))
+    # Consumed Resources
+    recovery_index = number_nodes + 1
+    height = 0.5 * consumed_recovery_resources / nodes_recovery_resources
+    x = [nodes_x[recovery_index][1], nodes_x[recovery_index][2], nodes_x[recovery_index][2], nodes_x[recovery_index][1]]
+    y = [0, 0, height, height] 
+    plot!(p, x, y, seriestype=:shape, color=:white)
+    # Left recovery resources
+    recovery_index = number_nodes + 1
+    x = [nodes_x[recovery_index][1], nodes_x[recovery_index][2], nodes_x[recovery_index][2], nodes_x[recovery_index][1]]
+    y = [height, height, 0.5, 0.5] 
+    plot!(p, x, y, seriestype=:shape, color=:black)
+
+    return plot!(p, title="Consumed CPU/Recovery resources", xticks=[c for c in 1: number_nodes + 1], ylim=(0, 0.5), xtick_labels=vcat(["Node $(c)" for c in 1: number_nodes], ["Recovery"]), yticks=0:20:(120), size=((400, 400)))
+end
+
+function plotting_recovery_resources()
+
+
 end
