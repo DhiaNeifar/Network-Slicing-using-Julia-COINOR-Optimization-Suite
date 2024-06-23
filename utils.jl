@@ -148,7 +148,7 @@ function master_objective_function(number_slices, number_nodes, nodes_state, tot
 end
 
 function recovery_objective_function(s, number_slices, number_nodes, number_VNFs, number_cycles, traffic, clocks, throughput, VNFs_placements, Virtual_links, β, Recovery_states, node_recovery_requirements)
-    θ = 0.5
+    θ = 0.05
     resources_consumed = sum(clocks[s, k] * VNFs_placements[s, k, c] for k in 1: number_VNFs for c in 1: number_nodes) + 
     sum(throughput[s, k] * Virtual_links[s, k, i, j] for k in 1: number_VNFs - 1 for i in 1: number_nodes for j in 1: number_nodes)
 
@@ -165,7 +165,7 @@ function recovery_master_objective_function(number_slices, number_nodes, nodes_s
     nodes_states_constraint = sum(λ[number_nodes * (number_nodes + 1) + c] * (nodes_state[c] + recovery_states[c] - 1) for c in 1: number_nodes)
     recovery_resources_constraint = λ[number_nodes * (number_nodes + 2) + 1] * (sum(node_recovery_requirements[c] * recovery_states[c] for c in 1: number_nodes) - nodes_recovery_resources)
 
-    return sum(objective_function(s, number_nodes, number_VNFs, number_cycles, traffic, clocks, throughput, VNFs_placements, Virtual_links, β) for s in 1: number_slices) - (nodes_resources_constraint + links_resources_constraint + nodes_states_constraint + recovery_resources_constraint) 
+    return sum(recovery_objective_function(s, number_slices, number_nodes, number_VNFs, number_cycles, traffic, clocks, throughput, VNFs_placements, Virtual_links, β, recovery_states, node_recovery_requirements) for s in 1: number_slices) - (nodes_resources_constraint + links_resources_constraint + nodes_states_constraint + recovery_resources_constraint) 
 end
 
 function verify_embedding(vnf_placement)

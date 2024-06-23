@@ -23,7 +23,7 @@ function primal_problem_recovery(number_slices, number_nodes, nodes_state, total
     end
     
     
-    @objective(model, Min, sum(objective_function(s, number_nodes, number_VNFs, number_cycles, traffic, clocks, throughput, VNFs_placements, Virtual_links, β) for s in 1: number_slices)) 
+    @objective(model, Min, sum(recovery_objective_function(s, number_slices, number_nodes, number_VNFs, number_cycles, traffic, clocks, throughput, VNFs_placements, Virtual_links, β, Recovery_states, node_recovery_requirements) for s in 1: number_slices)) 
     
     # Constraints
     constraints = Dict{String, ConstraintRef}()
