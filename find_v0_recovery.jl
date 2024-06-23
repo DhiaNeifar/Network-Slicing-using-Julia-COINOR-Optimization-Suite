@@ -5,7 +5,7 @@ const MOI = MathOptInterface
 include("utils.jl")
 
 
-function find_v0_recovery(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, β, nodes_recovery_resources, node_recovery_requirements)
+function find_v0_recovery(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, β)
     
     model = Model(HiGHS.Optimizer)
     set_silent(model)
@@ -33,7 +33,6 @@ function find_v0_recovery(number_slices, number_nodes, nodes_state, total_cpus_c
 
     clocks = [0.000001 for _ in 1: number_slices, _ in 1: number_VNFs]
     throughput = [0.01 for _ in 1: number_slices, _ in 1: number_VNFs - 1]
-    Recovery_states = zeros(number_nodes)
     @objective(model, Min, sum(objective_function(s, number_nodes, number_VNFs, number_cycles, traffic, clocks, throughput, VNFs_placements, Virtual_links, β) for s in 1: number_slices)) 
 
     # Constraints
@@ -54,7 +53,7 @@ function find_v0_recovery(number_slices, number_nodes, nodes_state, total_cpus_c
     end
     # Constraint 3: Guarantee that allocated VNF resources do not exceed physical servers' processing capacity.
     for c in 1: number_nodes
-        @constraint(model, sum(VNFs_placements[s, k, c] * clocks[s, k] for s in 1: number_slices, k in 1: number_VNFs) <= total_cpus_clocks[c] * (nodes_state[c] + Recovery_states[c]))
+        @constraint(model, sum(VNFs_placements[s, k, c] * clocks[s, k] for s in 1: number_slices, k in 1: number_VNFs) <= total_cpus_clocks[c] * nodes_state[c])
     end
 
     # Link Embedding Constraints

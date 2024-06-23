@@ -40,6 +40,16 @@ function load_data()
 end
 
 
+function recover_path()
+    recovery_path = joinpath(pwd(), "recovery_plots/")
+    test_dir = joinpath(recovery_path, "Test $(1 + length(readdir(recovery_path))))")
+    # Ensure the directory is created if it doesn't exist
+    if !isdir(test_dir)
+        mkdir(test_dir)
+    end
+    return test_dir
+end
+
 function display_solution(VNFs_placements, Virtual_links)
     number_slices, number_VNFs, total_number_centers, total_number_centers = size(Virtual_links)
     println("\n")
@@ -156,4 +166,69 @@ function recovery_master_objective_function(number_slices, number_nodes, nodes_s
     recovery_resources_constraint = λ[number_nodes * (number_nodes + 2) + 1] * (sum(node_recovery_requirements[c] * recovery_states[c] for c in 1: number_nodes) - nodes_recovery_resources)
 
     return sum(objective_function(s, number_nodes, number_VNFs, number_cycles, traffic, clocks, throughput, VNFs_placements, Virtual_links, β) for s in 1: number_slices) - (nodes_resources_constraint + links_resources_constraint + nodes_states_constraint + recovery_resources_constraint) 
+end
+
+function verify_embedding(vnf_placement)
+    println("VNF_EMBEDDING")
+    number_slices, number_VNFs, number_nodes = size(vnf_placement)
+    # Constraint 1: Each VNF is assigned only once to a center.
+    v = true
+    for s in 1: number_slices
+        for k in 1: number_VNFs
+            if sum(vnf_placement[s, k, c] for c in 1:number_nodes) != 1
+                println("Constraint 1 Violated!")    
+                v = false
+            end
+        end
+    end
+    # Constraint 2: Each VNF is assigned to an exactly one center.
+    for s in 1: number_slices
+        for c in 1: number_nodes
+            if sum(vnf_placement[s, k, c] for k in 1: number_VNFs) > 1
+                println("Constraint 2 Violated!")    
+                v = false
+            end
+        end
+    end
+    if v == true
+        println("VNF EMBEDDING SUCCESSFUL!")
+    end
+end
+
+
+function verify_recovery(total_cpus_clocks, vnf_placement, clocks, nodes_state, recovery_states, nodes_recovery_resources, node_recovery_requirements)
+    println("RECOVERY")
+    number_slices, number_VNFs, number_nodes = size(vnf_placement)
+    v = true
+    # Constraint 1: Guarantee that allocated VNF resources do not exceed physical servers' processing capacity.
+    for c in 1: number_nodes
+        consumed_ = sum(vnf_placement[s, k, c] * clocks[s, k] for s in 1: number_slices, k in 1: number_VNFs)
+        resources_ = total_cpus_clocks[c] * (nodes_state[c] + recovery_states[c])
+        if consumed_ > resources_
+            println("Constraint 1 Violated!")  
+            println("Consumed $(consumed_)")  
+            println("Resources $(resources_)")  
+            v = false
+        end
+    end
+    # Constraint 2: State of a node does not exceed one.
+    for c in 1: number_nodes
+        if nodes_state[c] + recovery_states[c] > 1
+            println("Constraint 2 Violated for node $(c)!")
+            println("Node state $(nodes_state[c])")
+            println("Node state Recovery $(recovery_states[c])")
+            v = false
+        end
+    end
+    # Constraint 3: Recovery resources used does not exceed available.
+    recovery_resources_consumed_ = sum(node_recovery_requirements[c] * recovery_states[c] for c in 1: number_nodes)
+    if recovery_resources_consumed_ > nodes_recovery_resources
+        println("Constraint 3 Violated!")
+        println("recovery_resources_consumed_ $(recovery_resources_consumed_)")
+        println("nodes_recovery_resources $(nodes_recovery_resources)")
+        v = false
+    end
+    if v == true
+        println("RECOVERY SUCCESSFUL!")
+    end
 end

@@ -62,17 +62,30 @@ function primal_problem_recovery(number_slices, number_nodes, nodes_state, total
     clocks_values = Array{Float32, 2}(undef, number_slices, number_VNFs)
     for s in 1: number_slices
         for k in 1: number_VNFs
-            clocks_values[s, k] = value(clocks[s, k])
+            if value(clocks[s, k]) < 0
+                clocks_values[s, k] = 0
+            else
+                clocks_values[s, k] = value(clocks[s, k])
+            end
         end
     end
     throughput_values = Array{Float32, 2}(undef, number_slices, number_VNFs - 1)
     for s in 1: number_slices
         for k in 1: number_VNFs - 1
-            throughput_values[s, k] = value(throughput[s, k])
+            if value(throughput[s, k]) < 0
+                throughput_values[s, k] = 0
+            else
+                throughput_values[s, k] = value(throughput[s, k])
+            end
         end
     end
     recovery_states_values = Array{Float32, 1}(undef, number_nodes)
     for c in 1: number_nodes
+        if value(Recovery_states[c]) < 0
+            recovery_states_values[c] = 0
+        else
+            recovery_states_values[c] = value(Recovery_states[c])
+        end
         recovery_states_values[c] = value(Recovery_states[c])
     end
 
@@ -93,6 +106,5 @@ function primal_problem_recovery(number_slices, number_nodes, nodes_state, total
     end
     con_name = "Recovery_Resources_constraint"
     push!(λ, dual(constraints[con_name]))
-
     return objective_value(model), clocks_values, throughput_values, recovery_states_values, λ
 end
