@@ -1,7 +1,7 @@
 using JuMP, AmplNLWriter, HiGHS, MathOptInterface
 
 
-function master_problem_recovery(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, Clocks, Throughputs, Recovery_states, lambdas, β, nodes_recovery_resources, node_recovery_requirements)
+function master_problem_recovery(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, Clocks, Throughputs, Recovery_states, lambdas, β, nodes_recovery_resources, node_recovery_requirements, θ)
     model = Model(HiGHS.Optimizer)
     set_silent(model)
     mu = @variable(model, base_name="auxiliary_variable")
@@ -34,7 +34,7 @@ function master_problem_recovery(number_slices, number_nodes, nodes_state, total
         throughput = Throughputs[index]
         λ = lambdas[index]
         recovery_states = Recovery_states[index]
-        @constraint(model, recovery_master_objective_function(number_slices, number_nodes, nodes_state, total_cpus_clocks, total_throughput, number_VNFs, number_cycles, traffic, clocks, throughput, VNFs_placements, Virtual_links, λ, β, recovery_states, nodes_recovery_resources, node_recovery_requirements) <= mu)
+        @constraint(model, recovery_master_objective_function(number_slices, number_nodes, nodes_state, total_cpus_clocks, total_throughput, number_VNFs, number_cycles, traffic, clocks, throughput, VNFs_placements, Virtual_links, λ, β, recovery_states, nodes_recovery_resources, node_recovery_requirements, θ) <= mu)
     end
 
     # Node Embedding Constraints

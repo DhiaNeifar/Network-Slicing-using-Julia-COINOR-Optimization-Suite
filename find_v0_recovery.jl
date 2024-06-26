@@ -4,7 +4,7 @@ using JuMP, AmplNLWriter, HiGHS, MathOptInterface
 include("utils.jl")
 
 
-function find_v0_recovery(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, β, node_recovery_requirements)
+function find_v0_recovery(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, β, node_recovery_requirements, θ)
     
     model = Model(HiGHS.Optimizer)
     set_silent(model)
@@ -32,7 +32,7 @@ function find_v0_recovery(number_slices, number_nodes, nodes_state, total_cpus_c
 
     clocks = [0.000001 for _ in 1: number_slices, _ in 1: number_VNFs]
     throughput = [0.01 for _ in 1: number_slices, _ in 1: number_VNFs - 1]
-    @objective(model, Min, sum(recovery_objective_function(s, number_slices, number_nodes, number_VNFs, number_cycles, traffic, clocks, throughput, VNFs_placements, Virtual_links, β, zeros(number_nodes), node_recovery_requirements) for s in 1: number_slices)) 
+    @objective(model, Min, sum(recovery_objective_function(s, number_slices, number_nodes, number_VNFs, number_cycles, traffic, clocks, throughput, VNFs_placements, Virtual_links, β, zeros(number_nodes), node_recovery_requirements, θ) for s in 1: number_slices)) 
 
     # Constraints
 

@@ -7,13 +7,12 @@ include("master_problem_recovery.jl")
 include("utils.jl")
 
 
-function RECOVERY_GBD(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, β, nodes_recovery_resources, node_recovery_requirements)
+function RECOVERY_GBD(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, β, nodes_recovery_resources, node_recovery_requirements, θ)
     
     # Initialization
-    epsilon = 1e-5
+    epsilon = 1e-3
     # distribution = virtual_nodes_distribution(number_VNFs, number_nodes, 0)
-    objective_value, vnf_placement, virtual_link = find_v0_recovery(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, β, node_recovery_requirements)
-    # display_solution(vnf_placement, virtual_link)
+    objective_value, vnf_placement, virtual_link = find_v0_recovery(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, β, node_recovery_requirements, θ)
     num_iter = 10
     UBD = Inf
     LBD = -Inf
@@ -33,9 +32,7 @@ function RECOVERY_GBD(number_slices, number_nodes, nodes_state, total_cpus_clock
     # println("Initial Guess")
     # display_solution(vnf_placement, virtual_link)
     for iter in 1: num_iter
-        objective_value, clocks, throughput, recovery_states, λ = primal_problem_recovery(number_slices, number_nodes, nodes_state, total_cpus_clocks, total_throughput, number_VNFs, number_cycles, traffic, vnf_placement, virtual_link, nodes_recovery_resources, node_recovery_requirements, β)
-        # compute_parameters(number_slices, number_nodes, number_VNFs, vnf_placement, virtual_link, clocks, throughput, number_uRLLC, number_eMBB, number_mMTC, number_cycles, traffic, delay_tolerance)
-
+        objective_value, clocks, throughput, recovery_states, λ = primal_problem_recovery(number_slices, number_nodes, nodes_state, total_cpus_clocks, total_throughput, number_VNFs, number_cycles, traffic, vnf_placement, virtual_link, nodes_recovery_resources, node_recovery_requirements, β, θ)
         push!(Clocks, clocks)
         push!(Throughputs, throughput)
         push!(Recovery_states, recovery_states)
@@ -49,11 +46,11 @@ function RECOVERY_GBD(number_slices, number_nodes, nodes_state, total_cpus_clock
             best_throughput = throughput
             best_objective_value = objective_value
         end
-        if abs(UBD - LBD) < epsilon
+        if abs(UBD - LBD) < epsilon || UBD < LBD
             print_iteration(iter, UBD, LBD)
             return best_objective_value, best_vnf_placement, best_virtual_link, best_recovery_states, best_clocks, best_throughput
         end
-        vnf_placement, virtual_link, mu = master_problem_recovery(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, Clocks, Throughputs, Recovery_states, lambdas, β, nodes_recovery_resources, node_recovery_requirements)
+        vnf_placement, virtual_link, mu = master_problem_recovery(number_slices, number_nodes, nodes_state, total_cpus_clocks, adjacency_matrix, total_throughput, number_VNFs, number_cycles, traffic, Clocks, Throughputs, Recovery_states, lambdas, β, nodes_recovery_resources, node_recovery_requirements, θ)
         best_vnf_placement, best_virtual_link = vnf_placement, virtual_link
         push!(VNFs_placements, vnf_placement)
         push!(Virtual_Links, virtual_link)
